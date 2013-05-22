@@ -620,7 +620,6 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
             v8::Local<v8::Object> v8Buffer = bufferConstructor->NewInstance(3, constructorArgs);
             obj->Set(String::New(col->name.c_str()), v8Buffer);
             delete v;
-            delete[] buffer;            
             break;
           }
           break;
@@ -649,7 +648,7 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns, vector
 
 void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
 
-  // HandleScope scope;
+  HandleScope scope;
   ExecuteBaton* baton = static_cast<ExecuteBaton*>(req->data);
 
   baton->connection->Unref();
