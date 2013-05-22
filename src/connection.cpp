@@ -621,6 +621,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
             obj->Set(String::New(col->name.c_str()), v8Buffer);
             delete v;
             delete[] buffer;            
+            delete v;
             break;
           }
           break;
@@ -722,7 +723,7 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
               output->clobVal.closeStream(instream);
               output->clobVal.close();
               obj->Set(String::New(returnParam.c_str()), String::New(buffer, lobLength));
-              delete[] buffer;
+              delete [] buffer;
               break;
             }
           case OutParam::OCCIBLOB:
