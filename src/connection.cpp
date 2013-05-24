@@ -622,6 +622,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
             delete v;
             delete[] buffer;            
             delete v;
+            delete[] buffer;            
             break;
           }
           break;
