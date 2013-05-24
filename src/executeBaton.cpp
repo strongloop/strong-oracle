@@ -12,6 +12,7 @@ ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql, v8::Local<v8
   this->callback = Persistent<Function>::New(*callback);
   this->outputs = new std::vector<output_t*>();
   CopyValuesToBaton(this, values);
+  this->error = NULL;
 }
 
 ExecuteBaton::~ExecuteBaton() {
@@ -69,6 +70,7 @@ oracle::occi::Date* V8DateToOcciDate(oracle::occi::Environment* env, v8::Local<v
 }
 
 void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* values) {
+    //XXX cache Length()
   for(uint32_t i=0; i<(*values)->Length(); i++) {
     v8::Local<v8::Value> val = (*values)->Get(i);
 
@@ -100,7 +102,7 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
     else if(val->IsNumber()) {
       value->type = VALUE_TYPE_NUMBER;
       double d = v8::Number::Cast(*val)->Value();
-      value->value = new oracle::occi::Number(d);
+      value->value = new oracle::occi::Number(d); // XXX not deleted in dtor
       baton->values.push_back(value);
     }
 
@@ -112,6 +114,7 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
       baton->values.push_back(value);
 
       output_t* output = new output_t();
+      output->rows = NULL;
       output->type = p->type();
       output->index = i + 1;
       baton->outputs->push_back(output);
@@ -119,6 +122,7 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
 
     // unhandled type
     else {
+        //XXX leaks new value on error
       std::ostringstream message;
       message << "CopyValuesToBaton: Unhandled value type";
       throw NodeOracleException(message.str());

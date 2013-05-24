@@ -60,6 +60,8 @@ Handle<Value> OracleClient::Connect(const Arguments& args) {
   baton->client = client;
   baton->callback = Persistent<Function>::New(callback);
   baton->environment = client->m_environment;
+  baton->error = NULL;
+  baton->connection = NULL;
 
   OBJ_GET_STRING(settings, "hostname", baton->hostname);
   OBJ_GET_STRING(settings, "user", baton->user);
