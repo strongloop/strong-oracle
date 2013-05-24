@@ -616,6 +616,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(std::vector<column_t*> columns, 
             v8::Local<v8::Object> v8Buffer = bufferConstructor->NewInstance(3, constructorArgs);
             obj->Set(String::New(col->name.c_str()), v8Buffer);
             delete v;
+            delete[] buffer;            
             break;
           }
           break;
