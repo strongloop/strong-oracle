@@ -21,6 +21,22 @@
           "link_settings": {"libraries": [ '-L<(oci_lib_dir)'] }
         }],
         ["OS=='win'", {
+	  "configurations": {
+          "Release": {
+            "msvs_settings": {
+              "VCCLCompilerTool": {
+                "RuntimeLibrary": "2"
+              }
+            },
+	  },   
+          "Debug": {
+            "msvs_settings": {
+              "VCCLCompilerTool": {
+              "RuntimeLibrary": "3"
+              }
+            }, 
+	  }
+	  },
           "variables": {
             "oci_include_dir%": "<!(IF DEFINED OCI_INCLUDE_DIR (echo %OCI_INCLUDE_DIR%) ELSE (echo C:\oracle\instantclient\sdk\include))",
             "oci_lib_dir%": "<!(IF DEFINED OCI_LIB_DIR (echo %OCI_LIB_DIR%) ELSE (echo C:\oracle\instantclient\sdk\lib\msvc))",
@@ -35,4 +51,5 @@
     }
   ]
 }
+
 
