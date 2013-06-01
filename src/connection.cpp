@@ -82,8 +82,7 @@ Handle<Value> Connection::Close(const Arguments& args) {
 
 	  return Undefined();
   } catch (const std::exception& ex) {
-	  printf("Exception: %s\n", ex.what());
-	  return Undefined();
+	  return ThrowException(Exception::Error(String::New(ex.what())));
   }
 }
 
