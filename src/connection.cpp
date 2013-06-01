@@ -240,7 +240,11 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, std::vector<
             stmt->registerOutParam(index, oracle::occi::OCCIBLOB);
             break;
           default:
-            throw NodeOracleException("SetValuesOnStatement: Unknown OutParam type: " + outParamType);
+            {
+                std::ostringstream oss;
+                oss << "SetValuesOnStatement: Unknown OutParam type: " << outParamType;
+                throw NodeOracleException(oss.str());
+            }
         }
         outputParam = index;
         break;
@@ -443,8 +447,12 @@ void Connection::EIO_Execute(uv_work_t* req) {
             output->numberVal = stmt->getNumber(output->index);
             break;
           default:
-            throw NodeOracleException("Unknown OutParam type: " + output->type);
-          }          
+            {
+                std::ostringstream oss;
+                oss << "Unknown OutParam type: " << output->type;
+                throw NodeOracleException(oss.str());
+            }
+          }
         }
       }
     } else if(status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
@@ -751,7 +759,11 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             obj->Set(String::New(returnParam.c_str()), Number::New(output->numberVal));
             break;
           default:
-            throw NodeOracleException("Unknown OutParam type: " + output->type);
+            {
+                 std::ostringstream oss;
+                 oss << "Unknown OutParam type: " << output->type;
+                 throw NodeOracleException(oss.str());
+             }
           }
         }
         argv[1] = obj;
