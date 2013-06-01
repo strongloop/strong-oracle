@@ -29,6 +29,7 @@ void OracleClient::Init(Handle<Object> target) {
   s_ct->SetClassName(String::NewSymbol("OracleClient"));
 
   NODE_SET_PROTOTYPE_METHOD(s_ct, "connect", Connect);
+  NODE_SET_PROTOTYPE_METHOD(s_ct, "connectSync", ConnectSync);
 
   target->Set(String::NewSymbol("OracleClient"), s_ct->GetFunction());
 }
@@ -124,6 +125,39 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
 
   delete baton;
 }
+
+Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
+  REQ_OBJECT_ARG(0, settings);
+
+  OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
+  connect_baton_t baton;
+  baton.client = client;
+  baton.environment = client->m_environment;
+  baton.error = NULL;
+  baton.connection = NULL;
+
+  OBJ_GET_STRING(settings, "hostname", baton.hostname);
+  OBJ_GET_STRING(settings, "user", baton.user);
+  OBJ_GET_STRING(settings, "password", baton.password);
+  OBJ_GET_STRING(settings, "database", baton.database);
+  OBJ_GET_NUMBER(settings, "port", baton.port, 1521);
+
+  try {
+    std::ostringstream connectionStr;
+    connectionStr << "//" << baton.hostname << ":" << baton.port << "/" << baton.database;
+    baton.connection = baton.environment->createConnection(baton.user, baton.password, connectionStr.str());
+  } catch(oracle::occi::SQLException &ex) {
+    baton.error = new std::string(ex.getMessage());
+    return ThrowException(Exception::Error(String::New(baton.error->c_str())));
+  }
+
+  Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+      (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.client->m_environment, baton.connection);
+
+  return connection;
+
+}
+
 
 extern "C" {
   static void init(Handle<Object> target) {

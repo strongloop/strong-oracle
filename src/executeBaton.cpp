@@ -9,7 +9,9 @@ using namespace std;
 ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql, v8::Local<v8::Array>* values, v8::Handle<v8::Function>* callback) {
   this->connection = connection;
   this->sql = sql;
-  this->callback = Persistent<Function>::New(*callback);
+  if(callback!=NULL) {
+    this->callback = Persistent<Function>::New(*callback);
+  }
   this->outputs = new std::vector<output_t*>();
   CopyValuesToBaton(this, values);
   this->error = NULL;

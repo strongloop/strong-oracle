@@ -21,6 +21,7 @@ void Connection::Init(Handle<Object> target) {
   constructorTemplate->SetClassName(String::NewSymbol("Connection"));
 
   NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
+  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "executeSync", ExecuteSync);
   NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "close", Close);
   NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "isConnected", IsConnected);
   NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "setAutoCommit", SetAutoCommit);
@@ -651,6 +652,24 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
   baton->connection->Unref();
   try {
     Handle<Value> argv[2];
+    handleResult(baton, argv);
+    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+  } catch(NodeOracleException &ex) {
+    Handle<Value> argv[2];
+    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
+    argv[1] = Undefined();
+    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+  } catch(const std::exception &ex) {
+	    Handle<Value> argv[2];
+	    argv[0] = Exception::Error(String::New(ex.what()));
+	    argv[1] = Undefined();
+	    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+  }
+
+  delete baton;
+}
+
+void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
     if(baton->error) {
       argv[0] = Exception::Error(String::New(baton->error->c_str()));
       argv[1] = Undefined();
@@ -661,7 +680,7 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
       } else {
         Local<Object> obj = Object::New();
         obj->Set(String::New("updateCount"), Integer::New(baton->updateCount));
-        
+
         /* Note: attempt to keep backward compatability here: existing users of this library will have code that expects a single out param
                  called 'returnParam'. For multiple out params, the first output will continue to be called 'returnParam' and subsequent outputs
                  will be called 'returnParamX'.
@@ -669,7 +688,7 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
         uint32_t index = 0;
         for (std::vector<output_t*>::iterator iterator = baton->outputs->begin(), end = baton->outputs->end(); iterator != end; ++iterator, index++) {
           output_t* output = *iterator;
-          std::stringstream ss;          
+          std::stringstream ss;
           ss << "returnParam";
           if(index > 0) ss << index;
           std::string returnParam(ss.str());
@@ -704,10 +723,10 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
               break;
             }
           case OutParam::OCCIBLOB:
-            { 
+            {
               output->blobVal.open(oracle::occi::OCCI_LOB_READONLY);
               int lobLength = output->blobVal.length();
-              oracle::occi::Stream* instream = output->blobVal.getStream(1,0);              
+              oracle::occi::Stream* instream = output->blobVal.getStream(1,0);
               char *buffer = new char[lobLength];
               memset(buffer, 0, lobLength);
               instream->readBuffer(buffer, lobLength);
@@ -734,7 +753,7 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
             break;
           default:
             throw NodeOracleException("Unknown OutParam type: " + output->type);
-          }          
+          }
         }
         argv[1] = obj;
       }
@@ -762,4 +781,33 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
 void Connection::setConnection(oracle::occi::Environment* environment, oracle::occi::Connection* connection) {
   m_environment = environment;
   m_connection = connection;
+}
+
+Handle<Value> Connection::ExecuteSync(const Arguments& args) {
+  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+
+  REQ_STRING_ARG(0, sql);
+  REQ_ARRAY_ARG(1, values);
+
+  String::AsciiValue sqlVal(sql);
+
+  ExecuteBaton* baton;
+  try {
+    baton = new ExecuteBaton(connection, *sqlVal, &values, NULL);
+  } catch(NodeOracleException &ex) {
+    return ThrowException(Exception::Error(String::New(ex.getMessage().c_str())));
+  }
+
+  uv_work_t* req = new uv_work_t();
+  req->data = baton;
+
+  baton->connection->Ref();
+  EIO_Execute(req);
+  baton->connection->Unref();
+  Handle<Value> argv[2];
+  handleResult(baton, argv);
+
+  delete baton;
+
+  return argv[1];
 }
