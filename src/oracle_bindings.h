@@ -28,6 +28,9 @@ public:
 private:
   static Persistent<FunctionTemplate> s_ct;
   oracle::occi::Environment* m_environment;
+  /*
+  oracle::occi::ConnectionPool *m_connectionPool;
+  */
 };
 
 #endif

@@ -37,6 +37,25 @@ void OracleClient::Init(Handle<Object> target) {
 Handle<Value> OracleClient::New(const Arguments& args) {
   HandleScope scope;
 
+  /*
+  REQ_OBJECT_ARG(0, settings);
+
+  std:string hostname, user, password, database;
+  unsigned int port, minConn, maxConn, incrConn;
+
+  OBJ_GET_STRING(settings, "hostname", hostname);
+  OBJ_GET_STRING(settings, "user", user);
+  OBJ_GET_STRING(settings, "password", password);
+  OBJ_GET_STRING(settings, "database", database);
+  OBJ_GET_NUMBER(settings, "port", port, 1521);
+  OBJ_GET_NUMBER(settings, "minConn", minConn, 0);
+  OBJ_GET_NUMBER(settings, "maxConn", maxConn, 1);
+  OBJ_GET_NUMBER(settings, "incrConn", incrConn, 1);
+
+  std::ostringstream connectionStr;
+      connectionStr << "//" << hostname << ":" << port << "/" << database;
+  */
+
   OracleClient *client = new OracleClient();
   client->Wrap(args.This());
   return args.This();
@@ -44,9 +63,15 @@ Handle<Value> OracleClient::New(const Arguments& args) {
 
 OracleClient::OracleClient() {
   m_environment = oracle::occi::Environment::createEnvironment(oracle::occi::Environment::THREADED_MUTEXED);
+  /*
+  m_connectionPool = m_environment->createConnectionPool(user, password, connectString, minConn, maxConn, incrConn);
+  */
 }
 
 OracleClient::~OracleClient() {
+  /*
+  m_environment->terminateConnectionPool (connectionPool);
+  */
   oracle::occi::Environment::terminateEnvironment(m_environment);
 }
 

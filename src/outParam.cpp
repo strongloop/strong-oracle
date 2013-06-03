@@ -6,6 +6,13 @@ using namespace std;
 
 Persistent<FunctionTemplate> OutParam::constructorTemplate;
 
+/**
+ * function OutParam(type, options) {
+ *   this._type = type || 0;
+ *   this._size = options.size;
+ *   this._inOut.hasInParam = options.in;
+ * }
+ */
 void OutParam::Init(Handle<Object> target) {
   HandleScope scope;
 
