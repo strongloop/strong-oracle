@@ -27,9 +27,14 @@ Handle<Value> OutParam::New(const Arguments& args) {
   HandleScope scope;
   OutParam *outParam = new OutParam();
 
-  outParam->_type = args[0]->IsUndefined() ? 0 : args[0]->NumberValue();
+  if(args.Length() >=1 ) {
+    outParam->_type = args[0]->IsUndefined() ? OutParam::OCCIINT : args[0]->NumberValue();
+  } else {
+    outParam->_type = OutParam::OCCIINT;
+  }
+
   
-  if (!args[1]->IsUndefined()) {
+  if (args.Length() >=2 && !args[1]->IsUndefined()) {
     REQ_OBJECT_ARG(1, opts);
     OBJ_GET_NUMBER(opts, "size", outParam->_size, 200);
 
