@@ -110,7 +110,10 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
 
     // output
     else if(val->IsObject() && val->ToObject()->FindInstanceInPrototypeChain(OutParam::constructorTemplate) != v8::Null()) {
-      OutParam* p = node::ObjectWrap::Unwrap<OutParam>(val->ToObject());
+      OutParam* op = node::ObjectWrap::Unwrap<OutParam>(val->ToObject());
+
+      // [rfeng] The OutParam object will be destructed. We need to create a new copy.
+      OutParam* p = new OutParam(*op);
       value->type = VALUE_TYPE_OUTPUT;
       value->value = p; 
       baton->values.push_back(value);
@@ -129,5 +132,6 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
       message << "CopyValuesToBaton: Unhandled value type";
       throw NodeOracleException(message.str());
     }
+
   }
 }

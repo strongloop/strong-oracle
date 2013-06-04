@@ -167,6 +167,7 @@ void RandomBytesFree(char* data, void* hint) {
 int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value_t*> &values) {
   uint32_t index = 1;
   int outputParam = -1;
+  OutParam * outParam = NULL;
   for (vector<value_t*>::iterator iterator = values.begin(), end = values.end(); iterator != end; ++iterator, index++) {
     value_t* val = *iterator;
     int outParamType;
@@ -184,33 +185,35 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value
       case VALUE_TYPE_DATE:
         stmt->setDate(index, *((oracle::occi::Date*)val->value));
         break;
-      case VALUE_TYPE_OUTPUT:        
-        outParamType = ((OutParam*)val->value)->type();
+      case VALUE_TYPE_OUTPUT:
+        outParam = static_cast<OutParam*>(val->value);
+        // std::cout << "OutParam B: " << outParam << " "<< outParam->type() << " " << outParam->_inOut.hasInParam << std::endl;
+        outParamType = outParam->type();
         switch(outParamType) {
           case OutParam::OCCIINT:
-            if (((OutParam*)val->value)->_inOut.hasInParam) {
-              stmt->setInt(index, ((OutParam*)val->value)->_inOut.intVal);
+            if (outParam->_inOut.hasInParam) {
+              stmt->setInt(index, outParam->_inOut.intVal);
             }else {
               stmt->registerOutParam(index, oracle::occi::OCCIINT);
             }
             break;
           case OutParam::OCCISTRING:
-            if (((OutParam*)val->value)->_inOut.hasInParam) {
-              stmt->setString(index, ((OutParam*)val->value)->_inOut.stringVal);
+            if (outParam->_inOut.hasInParam) {
+              stmt->setString(index, outParam->_inOut.stringVal);
             }else {
-              stmt->registerOutParam(index, oracle::occi::OCCISTRING, ((OutParam*)val->value)->size());
+              stmt->registerOutParam(index, oracle::occi::OCCISTRING, outParam->size());
             }
             break;
           case OutParam::OCCIDOUBLE:
-            if (((OutParam*)val->value)->_inOut.hasInParam) {
-              stmt->setDouble(index, ((OutParam*)val->value)->_inOut.doubleVal);
+            if (outParam->_inOut.hasInParam) {
+              stmt->setDouble(index, outParam->_inOut.doubleVal);
             }else {
               stmt->registerOutParam(index, oracle::occi::OCCIDOUBLE);
             }
             break;
           case OutParam::OCCIFLOAT:
-            if (((OutParam*)val->value)->_inOut.hasInParam) {
-              stmt->setFloat(index, ((OutParam*)val->value)->_inOut.floatVal);
+            if (outParam->_inOut.hasInParam) {
+              stmt->setFloat(index, outParam->_inOut.floatVal);
             }else {
               stmt->registerOutParam(index, oracle::occi::OCCIFLOAT);
             }
@@ -229,8 +232,8 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value
             break;
           case OutParam::OCCINUMBER:
             {
-              if (((OutParam*)val->value)->_inOut.hasInParam) {
-                stmt->setNumber(index, ((OutParam*)val->value)->_inOut.numberVal);
+              if (outParam->_inOut.hasInParam) {
+                stmt->setNumber(index, outParam->_inOut.numberVal);
               } else {
                 stmt->registerOutParam(index, oracle::occi::OCCINUMBER);
               }

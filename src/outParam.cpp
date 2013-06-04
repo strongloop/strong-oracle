@@ -32,7 +32,6 @@ Handle<Value> OutParam::New(const Arguments& args) {
   } else {
     outParam->_type = OutParam::OCCIINT;
   }
-
   
   if (args.Length() >=2 && !args[1]->IsUndefined()) {
     REQ_OBJECT_ARG(1, opts);
@@ -72,6 +71,7 @@ Handle<Value> OutParam::New(const Arguments& args) {
 }
 
 OutParam::OutParam() {
+  _type = OutParam::OCCIINT;
   _inOut.hasInParam = false;
   _size = 200;
 }
