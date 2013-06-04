@@ -47,6 +47,7 @@ Connection::~Connection() {
 }
 
 Handle<Value> Connection::Execute(const Arguments& args) {
+  HandleScope scope;
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_STRING_ARG(0, sql);
@@ -63,7 +64,7 @@ Handle<Value> Connection::Execute(const Arguments& args) {
     argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
     argv[1] = Undefined();
     callback->Call(Context::GetCurrent()->Global(), 2, argv);
-    return Undefined();
+    return scope.Close(Undefined());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -72,17 +73,18 @@ Handle<Value> Connection::Execute(const Arguments& args) {
 
   connection->Ref();
 
-  return Undefined();
+  return scope.Close(Undefined());
 }
 
 Handle<Value> Connection::Close(const Arguments& args) {
+  HandleScope scope;
   try {
 	  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 	  connection->closeConnection();
 
-	  return Undefined();
+	  return scope.Close(Undefined());
   } catch (const exception& ex) {
-	  return ThrowException(Exception::Error(String::New(ex.what())));
+	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
   }
 }
 
@@ -97,6 +99,7 @@ Handle<Value> Connection::IsConnected(const Arguments& args) {
 }
 
 Handle<Value> Connection::Commit(const Arguments& args) {
+  HandleScope scope;
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_FUN_ARG(0, callback);
@@ -109,7 +112,7 @@ Handle<Value> Connection::Commit(const Arguments& args) {
     argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
     argv[1] = Undefined();
     callback->Call(Context::GetCurrent()->Global(), 2, argv);
-    return Undefined();
+    return scope.Close(Undefined());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -118,10 +121,11 @@ Handle<Value> Connection::Commit(const Arguments& args) {
 
   connection->Ref();
 
-  return Undefined();
+  return scope.Close(Undefined());
 }
 
 Handle<Value> Connection::Rollback(const Arguments& args) {
+  HandleScope scope;
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_FUN_ARG(0, callback);
@@ -134,7 +138,7 @@ Handle<Value> Connection::Rollback(const Arguments& args) {
     argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
     argv[1] = Undefined();
     callback->Call(Context::GetCurrent()->Global(), 2, argv);
-    return Undefined();
+    return scope.Close(Undefined());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -143,14 +147,15 @@ Handle<Value> Connection::Rollback(const Arguments& args) {
 
   connection->Ref();
 
-  return Undefined();
+  return scope.Close(Undefined());
 }
 
 Handle<Value> Connection::SetAutoCommit(const Arguments& args) {
+  HandleScope scope;
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
   REQ_BOOL_ARG(0, autoCommit);
   connection->m_autoCommit = autoCommit;
-  return Undefined();
+  return scope.Close(Undefined());
 }
 
 void Connection::closeConnection() {
@@ -656,7 +661,7 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns, vector
 
 void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
 
-  HandleScope scope;
+  // HandleScope scope;
   ExecuteBaton* baton = static_cast<ExecuteBaton*>(req->data);
 
   baton->connection->Unref();
@@ -798,6 +803,7 @@ void Connection::setConnection(oracle::occi::Environment* environment, oracle::o
 }
 
 Handle<Value> Connection::ExecuteSync(const Arguments& args) {
+  HandleScope scope;
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_STRING_ARG(0, sql);
@@ -823,5 +829,5 @@ Handle<Value> Connection::ExecuteSync(const Arguments& args) {
 
   delete baton;
 
-  return argv[1];
+  return scope.Close(argv[1]);
 }
