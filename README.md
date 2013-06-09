@@ -66,7 +66,7 @@ To access a table you could then use:
 ```javascript
 oracle.connect(connData, function(err, connection) {
 
-  connection.setAutoCommit(true);
+or just the shortcut as declared in your `tnsnames.ora`:
 
   // selecting rows
   connection.execute("SELECT * FROM person", [], function(err, results) {
