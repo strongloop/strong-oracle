@@ -39,7 +39,7 @@ Handle<Value> Connection::New(const Arguments& args) {
   return args.This();
 }
 
-Connection::Connection() {
+Connection::Connection():m_connection(NULL), m_environment(NULL), m_autoCommit(true) {
 }
 
 Connection::~Connection() {
