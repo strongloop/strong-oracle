@@ -89,6 +89,11 @@ Handle<Value> OracleClient::Connect(const Arguments& args) {
   baton->error = NULL;
   baton->connection = NULL;
 
+  baton->hostname = "127.0.0.1";
+  baton->user = "";
+  baton->password = "";
+  baton->database = "";
+
   OBJ_GET_STRING(settings, "hostname", baton->hostname);
   OBJ_GET_STRING(settings, "user", baton->user);
   OBJ_GET_STRING(settings, "password", baton->password);
@@ -152,6 +157,7 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
 }
 
 Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
+  HandleScope scope;
   REQ_OBJECT_ARG(0, settings);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
@@ -160,6 +166,11 @@ Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
   baton.environment = client->m_environment;
   baton.error = NULL;
   baton.connection = NULL;
+
+  baton.hostname = "127.0.0.1";
+  baton.user = "";
+  baton.password = "";
+  baton.database = "";
 
   OBJ_GET_STRING(settings, "hostname", baton.hostname);
   OBJ_GET_STRING(settings, "user", baton.user);
@@ -173,13 +184,15 @@ Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
     baton.connection = baton.environment->createConnection(baton.user, baton.password, connectionStr.str());
   } catch(oracle::occi::SQLException &ex) {
     baton.error = new std::string(ex.getMessage());
-    return ThrowException(Exception::Error(String::New(baton.error->c_str())));
+    return scope.Close(ThrowException(Exception::Error(String::New(baton.error->c_str()))));
+  } catch (const std::exception& ex) {
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
   }
 
   Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
       (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.client->m_environment, baton.connection);
 
-  return connection;
+  return scope.Close(connection);
 
 }
 
