@@ -60,11 +60,7 @@ Handle<Value> Connection::Execute(const Arguments& args) {
   try {
     baton = new ExecuteBaton(connection, *sqlVal, &values, &callback);
   } catch(NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
-    argv[1] = Undefined();
-    callback->Call(Context::GetCurrent()->Global(), 2, argv);
-    return scope.Close(Undefined());
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
   }
 
   uv_work_t* req = new uv_work_t();
@@ -108,11 +104,7 @@ Handle<Value> Connection::Commit(const Arguments& args) {
   try {
     baton = new CommitBaton(connection, &callback);
   } catch(NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
-    argv[1] = Undefined();
-    callback->Call(Context::GetCurrent()->Global(), 2, argv);
-    return scope.Close(Undefined());
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
   }
 
   uv_work_t* req = new uv_work_t();
@@ -134,11 +126,7 @@ Handle<Value> Connection::Rollback(const Arguments& args) {
   try {
     baton = new RollbackBaton(connection, &callback);
   } catch(NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
-    argv[1] = Undefined();
-    callback->Call(Context::GetCurrent()->Global(), 2, argv);
-    return scope.Close(Undefined());
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
   }
 
   uv_work_t* req = new uv_work_t();
