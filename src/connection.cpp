@@ -345,6 +345,7 @@ void Connection::EIO_Commit(uv_work_t* req) {
 }
 
 void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
+  HandleScope scope;
   CommitBaton* baton = static_cast<CommitBaton*>(req->data);
 
   baton->connection->Unref();
@@ -367,6 +368,7 @@ void Connection::EIO_Rollback(uv_work_t* req) {
 }
 
 void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
+  HandleScope scope;
   RollbackBaton* baton = static_cast<RollbackBaton*>(req->data);
 
   baton->connection->Unref();
