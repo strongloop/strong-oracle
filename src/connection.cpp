@@ -36,7 +36,7 @@ Handle<Value> Connection::New(const Arguments& args) {
 
   Connection *connection = new Connection();
   connection->Wrap(args.This());
-  return args.This();
+  return scope.Close(args.This());
 }
 
 Connection::Connection():m_connection(NULL), m_environment(NULL), m_autoCommit(true) {
@@ -819,7 +819,11 @@ Handle<Value> Connection::ExecuteSync(const Arguments& args) {
   Handle<Value> argv[2];
   handleResult(baton, argv);
 
-  delete baton;
+  if(baton->error) {
+    delete baton;
+    return scope.Close(ThrowException(argv[0]));
+  }
 
+  delete baton;
   return scope.Close(argv[1]);
 }

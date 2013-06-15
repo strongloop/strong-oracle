@@ -67,7 +67,7 @@ Handle<Value> OracleClient::New(const Arguments& args) {
 
   OracleClient *client = new OracleClient();
   client->Wrap(args.This());
-  return args.This();
+  return scope.Close(args.This());
 }
 
 OracleClient::OracleClient() {
