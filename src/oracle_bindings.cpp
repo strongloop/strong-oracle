@@ -5,20 +5,29 @@
 
 Persistent<FunctionTemplate> OracleClient::s_ct;
 
-struct connect_baton_t {
-  OracleClient* client;
-  Persistent<Function> callback;
-  std::string hostname;
-  std::string user;
-  std::string password;
-  std::string database;
-  std::string tns;
-  uint32_t port;
-  oracle::occi::Environment *environment;
+ConnectBaton::ConnectBaton(OracleClient* client, oracle::occi::Environment* environment, v8::Handle<v8::Function>* callback) {
+  this->client = client;
+  if(callback != NULL) {
+    this->callback = Persistent<Function>::New(*callback);
+  } else {
+    this->callback = Persistent<Function>();
+  }
+  this->environment = environment;
+  this->error = NULL;
+  this->connection = NULL;
 
-  std::string* error;
-  oracle::occi::Connection* connection;
-};
+  this->hostname = "127.0.0.1";
+  this->user = "";
+  this->password = "";
+  this->database = "";
+}
+
+ConnectBaton::~ConnectBaton() {
+  callback.Dispose();
+  if(error) {
+    delete error;
+  }
+}
 
 void OracleClient::Init(Handle<Object> target) {
   HandleScope scope;
@@ -82,17 +91,7 @@ Handle<Value> OracleClient::Connect(const Arguments& args) {
   REQ_FUN_ARG(1, callback);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
-  connect_baton_t* baton = new connect_baton_t();
-  baton->client = client;
-  baton->callback = Persistent<Function>::New(callback);
-  baton->environment = client->m_environment;
-  baton->error = NULL;
-  baton->connection = NULL;
-
-  baton->hostname = "127.0.0.1";
-  baton->user = "";
-  baton->password = "";
-  baton->database = "";
+  ConnectBaton* baton = new ConnectBaton(client, client->m_environment, &callback);
 
   OBJ_GET_STRING(settings, "hostname", baton->hostname);
   OBJ_GET_STRING(settings, "user", baton->user);
@@ -111,7 +110,7 @@ Handle<Value> OracleClient::Connect(const Arguments& args) {
 }
 
 void OracleClient::EIO_Connect(uv_work_t* req) {
-  connect_baton_t* baton = static_cast<connect_baton_t*>(req->data);
+  ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
 
   baton->error = NULL;
 
@@ -130,7 +129,7 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
 
 void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
   HandleScope scope;
-  connect_baton_t* baton = static_cast<connect_baton_t*>(req->data);
+  ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
   baton->client->Unref();
 
   Handle<Value> argv[2];
@@ -150,9 +149,6 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
     node::FatalException(tryCatch);
   }
 
-  baton->callback.Dispose();
-  if(baton->error) delete baton->error;
-
   delete baton;
 }
 
@@ -161,16 +157,7 @@ Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
   REQ_OBJECT_ARG(0, settings);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
-  connect_baton_t baton;
-  baton.client = client;
-  baton.environment = client->m_environment;
-  baton.error = NULL;
-  baton.connection = NULL;
-
-  baton.hostname = "127.0.0.1";
-  baton.user = "";
-  baton.password = "";
-  baton.database = "";
+  ConnectBaton baton(client, client->m_environment, NULL);
 
   OBJ_GET_STRING(settings, "hostname", baton.hostname);
   OBJ_GET_STRING(settings, "user", baton.user);

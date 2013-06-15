@@ -33,4 +33,26 @@ private:
   */
 };
 
+class ConnectBaton {
+public:
+  ConnectBaton(OracleClient* client, oracle::occi::Environment* environment, v8::Handle<v8::Function>* callback);
+  ~ConnectBaton();
+
+  OracleClient* client;
+  Persistent<Function> callback;
+
+  std::string hostname;
+  std::string user;
+  std::string password;
+  std::string database;
+  std::string tns;
+  uint32_t port;
+
+  oracle::occi::Environment* environment;
+  oracle::occi::Connection* connection;
+
+  std::string* error;
+};
+
+
 #endif
