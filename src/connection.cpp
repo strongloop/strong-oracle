@@ -469,6 +469,8 @@ void Connection::EIO_Execute(uv_work_t* req) {
     baton->error = new string(ex.getMessage());
   } catch (const exception& ex) {
 	baton->error = new string(ex.what());
+  } catch (...) {
+    baton->error = new string("Unknown Error");
   }
 
   if(stmt && rs) {
