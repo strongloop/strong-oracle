@@ -42,7 +42,7 @@
             "oci_lib_dir%": "<!(IF DEFINED OCI_LIB_DIR (echo %OCI_LIB_DIR%) ELSE (echo C:\oracle\instantclient\sdk\lib\msvc))",
          },
          # "libraries": [ "-loci" ],
-         "link_settings": {"libraries": [ '<(oci_lib_dir)\oraocci11.lib'] }
+         "link_settings": {"libraries": [ '<(oci_lib_dir)\oraocci12.lib'] }
         }]
       ],
       "include_dirs": [ "<(oci_include_dir)" ],
