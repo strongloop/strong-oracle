@@ -9,16 +9,16 @@
   },
   "maintainers": [
     {
-      "name": "Joe Ferner",
-      "email": "joe@fernsroth.com"
+      "name": "Raymond Feng",
+      "email": "raymond@strongloop.com"
     }
   ],
   "bugs": {
-    "url": "https://github.com/nearinfinity/node-oracle/issues"
+    "url": "https://github.com/strongloop/node-oracle/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/nearinfinity/node-oracle.git"
+    "url": "git://github.com/strongloop/node-oracle.git"
   },
   "dependencies": {
   },
