@@ -36,6 +36,16 @@ Linux:
     ln -s libclntsh.so.11.1 libclntsh.so
     ln -s libocci.so.11.1 libocci.so
 
+`libaio` library is required on Linux systems:
+
+* On Unbuntu/Debian
+
+        ﻿sudo apt-get install libaio1
+
+* On Fedora/CentOS/RHEL
+
+        ﻿sudo yum install libaio
+
 3. Configure the dynamic library path
 
 MacOS:
