@@ -85,12 +85,13 @@ Handle<Value> Connection::Close(const Arguments& args) {
 }
 
 Handle<Value> Connection::IsConnected(const Arguments& args) {
+  HandleScope scope;
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   if(connection && connection->m_connection) {
-    return Boolean::New(true);
+    return scope.Close(Boolean::New(true));
   } else {
-    return Boolean::New(false);
+    return scope.Close(Boolean::New(false));
   }
 }
 
@@ -354,11 +355,12 @@ void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
   argv[0] = Undefined();
   v8::TryCatch tryCatch;
   baton->callback->Call(Context::GetCurrent()->Global(), 1, argv);
+  delete baton;
+
   if (tryCatch.HasCaught()) {
     node::FatalException(tryCatch);
   }
 
-  delete baton;
 }
 
 void Connection::EIO_Rollback(uv_work_t* req) {
@@ -377,11 +379,12 @@ void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
   argv[0] = Undefined();
   v8::TryCatch tryCatch;
   baton->callback->Call(Context::GetCurrent()->Global(), 1, argv);
+  delete baton;
+
   if (tryCatch.HasCaught()) {
     node::FatalException(tryCatch);
   }
 
-  delete baton;
 }
 
 void Connection::EIO_Execute(uv_work_t* req) {
@@ -625,8 +628,6 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
             obj->Set(String::New(col->name.c_str()), v8Buffer);
             delete v;
             delete[] buffer;            
-            delete v;
-            delete[] buffer;            
             break;
           }
           break;
@@ -679,6 +680,7 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
 }
 
 void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
+try {
     if(baton->error) {
       argv[0] = Exception::Error(String::New(baton->error->c_str()));
       argv[1] = Undefined();
@@ -749,6 +751,7 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
               v8::Handle<v8::Value> constructorArgs[3] = { nodeBuff->handle_, v8::Integer::New(lobLength), v8::Integer::New(0) };
               v8::Local<v8::Object> v8Buffer = bufferConstructor->NewInstance(3, constructorArgs);
               obj->Set(String::New(returnParam.c_str()), v8Buffer);
+              delete [] buffer;
               break;
             }
           case OutParam::OCCIDATE:
@@ -771,11 +774,6 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
         argv[1] = obj;
       }
     }
-    v8::TryCatch tryCatch;
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-    if (tryCatch.HasCaught()) {
-      node::FatalException(tryCatch);
-    }
   } catch(NodeOracleException &ex) {
     Handle<Value> argv[2];
     argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
@@ -788,7 +786,6 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
 	    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
   }
 
-  delete baton;
 }
 
 void Connection::setConnection(oracle::occi::Environment* environment, oracle::occi::Connection* connection) {
