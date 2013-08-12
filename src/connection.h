@@ -39,8 +39,9 @@ public:
   Connection();
   ~Connection();
 
-  void setConnection(oracle::occi::Environment* environment, oracle::occi::Connection* connection);
+  void setConnection(oracle::occi::Environment* environment, oracle::occi::StatelessConnectionPool* connectionPool, oracle::occi::Connection* connection);
   oracle::occi::Environment* getEnvironment() { return m_environment; }
+  // oracle::occi::StatelessConnectionPool* getConnectionPool() { return m_connectionPool; }
 
 private:
   static int SetValuesOnStatement(oracle::occi::Statement* stmt, std::vector<value_t*> &values);
@@ -50,9 +51,40 @@ private:
   static Local<Object> CreateV8ObjectFromRow(std::vector<column_t*> columns, row_t* currentRow);
   static void handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]);
 
+  oracle::occi::StatelessConnectionPool* m_connectionPool;
   oracle::occi::Connection* m_connection;
   oracle::occi::Environment* m_environment;
   bool m_autoCommit;
 };
+
+// ConnectionPool
+class ConnectionPool : ObjectWrap {
+public:
+  static void Init(Handle<Object> target);
+  static Handle<Value> New(const Arguments& args);
+
+  static Handle<Value> Close(const Arguments& args);
+
+  static Persistent<FunctionTemplate> connectionPoolConstructorTemplate;
+
+  static Handle<Value> GetConnection(const Arguments& args);
+  // static void EIO_GetConnection(uv_work_t* req);
+  // static void EIO_AfterGetConnection(uv_work_t* req, int status);
+
+  void closeConnectionPool();
+
+  ConnectionPool();
+  ~ConnectionPool();
+
+  void setConnectionPool(oracle::occi::Environment* environment, oracle::occi::StatelessConnectionPool* connectionPool);
+  oracle::occi::Environment* getEnvironment() { return m_environment; }
+  oracle::occi::StatelessConnectionPool* getConnectionPool() { return m_connectionPool; }
+
+private:
+  oracle::occi::StatelessConnectionPool* m_connectionPool;
+  oracle::occi::Environment* m_environment;
+
+};
+
 
 #endif

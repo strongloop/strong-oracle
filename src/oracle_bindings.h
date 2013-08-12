@@ -22,15 +22,19 @@ public:
   static void EIO_Connect(uv_work_t* req);
   static void EIO_AfterConnect(uv_work_t* req, int status);
 
+  static Handle<Value> CreateConnectionPool(const Arguments& args);
+  static void EIO_CreateConnectionPool(uv_work_t* req);
+  static void EIO_AfterCreateConnectionPool(uv_work_t* req, int status);
+
+  static Handle<Value> CreateConnectionPoolSync(const Arguments& args);
+
   OracleClient();
   ~OracleClient();
 
 private:
   static Persistent<FunctionTemplate> s_ct;
   oracle::occi::Environment* m_environment;
-  /*
-  oracle::occi::ConnectionPool *m_connectionPool;
-  */
+  oracle::occi::StatelessConnectionPool* m_connectionPool;
 };
 
 class ConnectBaton {
@@ -47,8 +51,13 @@ public:
   std::string database;
   std::string tns;
   uint32_t port;
+  uint32_t minConn;
+  uint32_t maxConn;
+  uint32_t incrConn;
+  uint32_t timeout;
 
   oracle::occi::Environment* environment;
+  oracle::occi::StatelessConnectionPool* connectionPool;
   oracle::occi::Connection* connection;
 
   std::string* error;
