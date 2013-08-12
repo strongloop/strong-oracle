@@ -22,6 +22,7 @@ void ConnectionPool::Init(Handle<Object> target) {
 
   NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnection", GetConnection);
   NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "close", ConnectionPool::Close);
+  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getInfo", ConnectionPool::GetInfo);
 
   target->Set(String::NewSymbol("ConnectionPool"), ConnectionPool::connectionPoolConstructorTemplate->GetFunction());
 }
@@ -56,6 +57,28 @@ Handle<Value> ConnectionPool::Close(const Arguments& args) {
 	  return scope.Close(Undefined());
   } catch (const exception& ex) {
 	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+  }
+}
+
+Handle<Value> ConnectionPool::GetInfo(const Arguments& args) {
+  HandleScope scope;
+  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+  if(connectionPool->m_connectionPool) {
+    Local<Object> obj = Object::New();
+
+    obj->Set(String::NewSymbol("openConnections"), Uint32::New(connectionPool->m_connectionPool->getOpenConnections()));
+    obj->Set(String::NewSymbol("busyConnections"), Uint32::New(connectionPool->m_connectionPool->getBusyConnections()));
+    obj->Set(String::NewSymbol("maxConnections"), Uint32::New(connectionPool->m_connectionPool->getMaxConnections()));
+    obj->Set(String::NewSymbol("minConnections"), Uint32::New(connectionPool->m_connectionPool->getMinConnections()));
+    obj->Set(String::NewSymbol("incrConnections"), Uint32::New(connectionPool->m_connectionPool->getIncrConnections()));
+    obj->Set(String::NewSymbol("busyOption"), Uint32::New(connectionPool->m_connectionPool->getBusyOption()));
+    obj->Set(String::NewSymbol("timeout"), Uint32::New(connectionPool->m_connectionPool->getTimeOut()));
+
+    obj->Set(String::NewSymbol("poolName"), String::New(connectionPool->m_connectionPool->getPoolName().c_str()));
+
+    return scope.Close(obj);
+  } else {
+    return scope.Close(Undefined());
   }
 }
 

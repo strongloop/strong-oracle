@@ -192,7 +192,7 @@ Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
 
   std::string hostname, user, password, database, tns;
-  unsigned int port, minConn, maxConn, incrConn, timeout;
+  unsigned int port, minConn, maxConn, incrConn, timeout, busyOption;
 
   OBJ_GET_STRING(settings, "hostname", hostname);
   OBJ_GET_STRING(settings, "user", user);
@@ -203,6 +203,7 @@ Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
   OBJ_GET_NUMBER(settings, "maxConn", maxConn, 4);
   OBJ_GET_NUMBER(settings, "incrConn", incrConn, 1);
   OBJ_GET_NUMBER(settings, "timeout", timeout, 0);
+  OBJ_GET_NUMBER(settings, "busyOption", busyOption, 0);
   OBJ_GET_STRING(settings, "tns", tns);
 
 
@@ -218,6 +219,7 @@ Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
                                     minConn, incrConn,
                                     oracle::occi::StatelessConnectionPool::HOMOGENEOUS);
   scp->setTimeOut(timeout);
+  scp->setBusyOption(static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption));
 
   Handle<Object> connectionPool = ConnectionPool::connectionPoolConstructorTemplate->GetFunction()->NewInstance();
   (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
@@ -235,6 +237,8 @@ Handle<Value> OracleClient::CreateConnectionPool(const Arguments& args) {
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
   ConnectBaton* baton = new ConnectBaton(client, client->m_environment, &callback);
 
+  uint32_t busyOption;
+
   OBJ_GET_STRING(settings, "hostname", baton->hostname);
   OBJ_GET_STRING(settings, "user", baton->user);
   OBJ_GET_STRING(settings, "password", baton->password);
@@ -244,6 +248,8 @@ Handle<Value> OracleClient::CreateConnectionPool(const Arguments& args) {
   OBJ_GET_NUMBER(settings, "maxConn", baton->maxConn, 4);
   OBJ_GET_NUMBER(settings, "incrConn", baton->incrConn, 1);
   OBJ_GET_NUMBER(settings, "timeout", baton->timeout, 0);
+  OBJ_GET_NUMBER(settings, "busyOption", busyOption, 0);
+  baton->busyOption = static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption);
   OBJ_GET_STRING(settings, "tns", baton->tns);
 
 
@@ -278,6 +284,7 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
                                     baton->incrConn,
                                     oracle::occi::StatelessConnectionPool::HOMOGENEOUS);
     scp->setTimeOut(baton->timeout);
+    scp->setBusyOption(baton->busyOption);
     baton->connectionPool = scp;
 
   } catch(oracle::occi::SQLException &ex) {

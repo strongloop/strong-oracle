@@ -55,6 +55,7 @@ public:
   uint32_t maxConn;
   uint32_t incrConn;
   uint32_t timeout;
+  oracle::occi::StatelessConnectionPool::BusyOption busyOption;
 
   oracle::occi::Environment* environment;
   oracle::occi::StatelessConnectionPool* connectionPool;

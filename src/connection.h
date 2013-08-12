@@ -16,6 +16,9 @@
 using namespace node;
 using namespace v8;
 
+/**
+ * Wrapper for an OCCI Connection class so that it can be used in JavaScript
+ */
 class Connection : ObjectWrap {
 public:
   static void Init(Handle<Object> target);
@@ -40,8 +43,8 @@ public:
   ~Connection();
 
   void setConnection(oracle::occi::Environment* environment, oracle::occi::StatelessConnectionPool* connectionPool, oracle::occi::Connection* connection);
+
   oracle::occi::Environment* getEnvironment() { return m_environment; }
-  // oracle::occi::StatelessConnectionPool* getConnectionPool() { return m_connectionPool; }
 
 private:
   static int SetValuesOnStatement(oracle::occi::Statement* stmt, std::vector<value_t*> &values);
@@ -57,12 +60,14 @@ private:
   bool m_autoCommit;
 };
 
-// ConnectionPool
+/**
+ * Wrapper for an OCCI StatelessConnectionPool class so that it can be used in JavaScript
+ */
 class ConnectionPool : ObjectWrap {
 public:
   static void Init(Handle<Object> target);
   static Handle<Value> New(const Arguments& args);
-
+  static Handle<Value> GetInfo(const Arguments& args);
   static Handle<Value> Close(const Arguments& args);
 
   static Persistent<FunctionTemplate> connectionPoolConstructorTemplate;
