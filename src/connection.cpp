@@ -20,7 +20,8 @@ void ConnectionPool::Init(Handle<Object> target) {
   ConnectionPool::connectionPoolConstructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
   ConnectionPool::connectionPoolConstructorTemplate->SetClassName(String::NewSymbol("ConnectionPool"));
 
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnection", GetConnection);
+  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnectionSync", ConnectionPool::GetConnectionSync);
+  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnection", ConnectionPool::GetConnection);
   NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "close", ConnectionPool::Close);
   NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getInfo", ConnectionPool::GetInfo);
 
@@ -82,7 +83,7 @@ Handle<Value> ConnectionPool::GetInfo(const Arguments& args) {
   }
 }
 
-Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
+Handle<Value> ConnectionPool::GetConnectionSync(const Arguments& args) {
   HandleScope scope;
   try {
 	  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
@@ -94,6 +95,67 @@ Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
   } catch (const exception& ex) {
 	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
   }
+}
+
+Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
+  HandleScope scope;
+  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+
+  REQ_FUN_ARG(0, callback);
+
+  ConnectionPoolBaton* baton;
+  try {
+    baton = new ConnectionPoolBaton(connectionPool->getEnvironment(), connectionPool, &callback);
+  } catch(NodeOracleException &ex) {
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+  }
+
+  uv_work_t* req = new uv_work_t();
+  req->data = baton;
+  uv_queue_work(uv_default_loop(), req, ConnectionPool::EIO_GetConnection, (uv_after_work_cb)ConnectionPool::EIO_AfterGetConnection);
+
+  connectionPool->Ref();
+
+  return scope.Close(Undefined());
+}
+
+void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  baton->error = NULL;
+  try {
+    oracle::occi::Connection *conn= baton->connectionPool->getConnectionPool()->getConnection("node-oracle");
+    baton->connection = conn;
+  } catch(oracle::occi::SQLException &ex) {
+      baton->error = new std::string(ex.getMessage());
+  }
+}
+
+
+void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
+  HandleScope scope;
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+
+  baton->connectionPool->Unref();
+
+  Handle<Value> argv[2];
+  if(baton->error) {
+    argv[0] = Exception::Error(String::New(baton->error->c_str()));
+    argv[1] = Undefined();
+  } else {
+    argv[0] = Undefined();
+    Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->environment, baton->connectionPool->getConnectionPool(), baton->connection);
+    argv[1] = connection;
+  }
+
+  v8::TryCatch tryCatch;
+  baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+  delete baton;
+
+  if (tryCatch.HasCaught()) {
+    node::FatalException(tryCatch);
+  }
+
 }
 
 void ConnectionPool::closeConnectionPool() {

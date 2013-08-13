@@ -72,9 +72,10 @@ public:
 
   static Persistent<FunctionTemplate> connectionPoolConstructorTemplate;
 
+  static Handle<Value> GetConnectionSync(const Arguments& args);
   static Handle<Value> GetConnection(const Arguments& args);
-  // static void EIO_GetConnection(uv_work_t* req);
-  // static void EIO_AfterGetConnection(uv_work_t* req, int status);
+  static void EIO_GetConnection(uv_work_t* req);
+  static void EIO_AfterGetConnection(uv_work_t* req, int status);
 
   void closeConnectionPool();
 
@@ -91,5 +92,26 @@ private:
 
 };
 
+class ConnectionPoolBaton {
+public:
+  ConnectionPoolBaton(oracle::occi::Environment* environment, ConnectionPool* connectionPool, v8::Handle<v8::Function>* callback) {
+    this->environment = environment;
+    this->connectionPool = connectionPool;
+    this->callback = Persistent<Function>::New(*callback);
+    this->connection = NULL;
+  }
+
+  ~ConnectionPoolBaton() {
+    callback.Dispose();
+  }
+
+  oracle::occi::Environment* environment;
+  ConnectionPool *connectionPool;
+  oracle::occi::Connection* connection;
+  v8::Persistent<v8::Function> callback;
+
+  std::string* error;
+
+};
 
 #endif
