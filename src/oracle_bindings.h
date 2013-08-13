@@ -34,7 +34,7 @@ public:
 private:
   static Persistent<FunctionTemplate> s_ct;
   oracle::occi::Environment* m_environment;
-  oracle::occi::StatelessConnectionPool* m_connectionPool;
+  // oracle::occi::StatelessConnectionPool* m_connectionPool;
 };
 
 class ConnectBaton {
