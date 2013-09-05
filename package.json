@@ -2,10 +2,10 @@
   "name": "oracle",
   "description": "Oracle database driver",
   "keywords": ["database", "db", "oracle"],
-  "homepage": "https://github.com/nearinfinity/node-oracle",
-  "version": "0.3.2",
+  "homepage": "https://github.com/strongloop/node-oracle",
+  "version": "0.3.3",
   "engines": {
-    "node": ">=0.6.0"
+    "node": ">=0.10.0"
   },
   "maintainers": [
     {
