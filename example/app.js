@@ -19,7 +19,7 @@ ora.createConnectionPool(settings, function(err, pool) {
     return;
   }
   console.log(pool.getInfo());
-  var conn = pool.getConnection(function(err, conn) {
+  pool.getConnection(function(err, conn) {
     conn.setAutoCommit(false);
     console.log(pool.getInfo());
     console.log(sql);
