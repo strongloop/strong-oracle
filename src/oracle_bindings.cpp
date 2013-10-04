@@ -102,6 +102,10 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
     baton->connection = baton->environment->createConnection(baton->user, baton->password, connectionStr.str());
   } catch(oracle::occi::SQLException &ex) {
     baton->error = new std::string(ex.getMessage());
+  } catch (const std::exception& ex) {
+    baton->error = new std::string(ex.what());
+  } catch (...) {
+    baton->error = new std::string("Unknown exception is thrown");
   }
 }
 
@@ -148,8 +152,7 @@ Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
     connectionStr << "//" << baton.hostname << ":" << baton.port << "/" << baton.database;
     baton.connection = baton.environment->createConnection(baton.user, baton.password, connectionStr.str());
   } catch(oracle::occi::SQLException &ex) {
-    baton.error = new std::string(ex.getMessage());
-    return scope.Close(ThrowException(Exception::Error(String::New(baton.error->c_str()))));
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
   } catch (const std::exception& ex) {
     return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
   }
@@ -183,26 +186,30 @@ Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
   OBJ_GET_NUMBER(settings, "busyOption", busyOption, 0);
   OBJ_GET_STRING(settings, "tns", tns);
 
+  try {
+    std::ostringstream connectionStr;
+    if (tns != "") {
+      connectionStr << tns;
+    } else {
+      connectionStr << "//" << hostname << ":" << port << "/" << database;
+    }
 
-  std::ostringstream connectionStr;
-  if (tns != "") {
-    connectionStr << tns;
-  } else {
-    connectionStr << "//" << hostname << ":" << port << "/" << database;
-  }
-
-  oracle::occi::StatelessConnectionPool *scp = client->m_environment->createStatelessConnectionPool(
+    oracle::occi::StatelessConnectionPool *scp = client->m_environment->createStatelessConnectionPool(
                                     user, password, connectionStr.str(), maxConn,
                                     minConn, incrConn,
                                     oracle::occi::StatelessConnectionPool::HOMOGENEOUS);
-  scp->setTimeOut(timeout);
-  scp->setBusyOption(static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption));
+    scp->setTimeOut(timeout);
+    scp->setBusyOption(static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption));
 
-  Handle<Object> connectionPool = ConnectionPool::connectionPoolConstructorTemplate->GetFunction()->NewInstance();
-  (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
+    Handle<Object> connectionPool = ConnectionPool::connectionPoolConstructorTemplate->GetFunction()->NewInstance();
+    (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
 
-  return scope.Close(connectionPool);
-
+    return scope.Close(connectionPool);
+  } catch(oracle::occi::SQLException &ex) {
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+  } catch (const std::exception& ex) {
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+  }
 }
 
 Handle<Value> OracleClient::CreateConnectionPool(const Arguments& args) {
@@ -266,6 +273,10 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
 
   } catch(oracle::occi::SQLException &ex) {
     baton->error = new std::string(ex.getMessage());
+  } catch (const std::exception& ex) {
+    baton->error = new std::string(ex.what());
+  } catch (...) {
+    baton->error = new std::string("Unknown exception is thrown");
   }
 }
 
