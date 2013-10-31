@@ -10,25 +10,181 @@
 #include <iostream>
 using namespace std;
 
+Persistent<FunctionTemplate> ConnectionPool::connectionPoolConstructorTemplate;
+
+void ConnectionPool::Init(Handle<Object> target) {
+  HandleScope scope;
+
+  Local<FunctionTemplate> t = FunctionTemplate::New(ConnectionPool::New);
+  ConnectionPool::connectionPoolConstructorTemplate = Persistent<FunctionTemplate>::New(t);
+  ConnectionPool::connectionPoolConstructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  ConnectionPool::connectionPoolConstructorTemplate->SetClassName(String::NewSymbol("ConnectionPool"));
+
+  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnectionSync", ConnectionPool::GetConnectionSync);
+  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnection", ConnectionPool::GetConnection);
+  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "close", ConnectionPool::Close);
+  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getInfo", ConnectionPool::GetInfo);
+
+  target->Set(String::NewSymbol("ConnectionPool"), ConnectionPool::connectionPoolConstructorTemplate->GetFunction());
+}
+
+Handle<Value> ConnectionPool::New(const Arguments& args) {
+  HandleScope scope;
+
+  ConnectionPool *connectionPool = new ConnectionPool();
+  connectionPool->Wrap(args.This());
+  return scope.Close(args.This());
+}
+
+ConnectionPool::ConnectionPool():m_connectionPool(NULL), m_environment(NULL) {
+}
+
+ConnectionPool::~ConnectionPool() {
+  closeConnectionPool();
+}
+
+void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment, oracle::occi::StatelessConnectionPool* connectionPool) {
+    m_environment = environment;
+    m_connectionPool = connectionPool;
+}
+
+
+Handle<Value> ConnectionPool::Close(const Arguments& args) {
+  HandleScope scope;
+  try {
+	  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+	  connectionPool->closeConnectionPool();
+
+	  return scope.Close(Undefined());
+  } catch (const exception& ex) {
+	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+  }
+}
+
+Handle<Value> ConnectionPool::GetInfo(const Arguments& args) {
+  HandleScope scope;
+  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+  if(connectionPool->m_connectionPool) {
+    Local<Object> obj = Object::New();
+
+    obj->Set(String::NewSymbol("openConnections"), Uint32::New(connectionPool->m_connectionPool->getOpenConnections()));
+    obj->Set(String::NewSymbol("busyConnections"), Uint32::New(connectionPool->m_connectionPool->getBusyConnections()));
+    obj->Set(String::NewSymbol("maxConnections"), Uint32::New(connectionPool->m_connectionPool->getMaxConnections()));
+    obj->Set(String::NewSymbol("minConnections"), Uint32::New(connectionPool->m_connectionPool->getMinConnections()));
+    obj->Set(String::NewSymbol("incrConnections"), Uint32::New(connectionPool->m_connectionPool->getIncrConnections()));
+    obj->Set(String::NewSymbol("busyOption"), Uint32::New(connectionPool->m_connectionPool->getBusyOption()));
+    obj->Set(String::NewSymbol("timeout"), Uint32::New(connectionPool->m_connectionPool->getTimeOut()));
+
+    obj->Set(String::NewSymbol("poolName"), String::New(connectionPool->m_connectionPool->getPoolName().c_str()));
+
+    return scope.Close(obj);
+  } else {
+    return scope.Close(Undefined());
+  }
+}
+
+Handle<Value> ConnectionPool::GetConnectionSync(const Arguments& args) {
+  HandleScope scope;
+  try {
+	  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+	  // std::string tag = "node-oracle";
+	  oracle::occi::Connection *conn= connectionPool->getConnectionPool()->getConnection("node-oracle");
+      Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+      (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(connectionPool->getEnvironment(), connectionPool->getConnectionPool(), conn);
+      return scope.Close(connection);
+  } catch (const exception& ex) {
+	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+  }
+}
+
+Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
+  HandleScope scope;
+  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+
+  REQ_FUN_ARG(0, callback);
+
+  ConnectionPoolBaton* baton;
+  try {
+    baton = new ConnectionPoolBaton(connectionPool->getEnvironment(), connectionPool, &callback);
+  } catch(NodeOracleException &ex) {
+    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+  }
+
+  uv_work_t* req = new uv_work_t();
+  req->data = baton;
+  uv_queue_work(uv_default_loop(), req, ConnectionPool::EIO_GetConnection, (uv_after_work_cb)ConnectionPool::EIO_AfterGetConnection);
+
+  connectionPool->Ref();
+
+  return scope.Close(Undefined());
+}
+
+void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  baton->error = NULL;
+  try {
+    oracle::occi::Connection *conn= baton->connectionPool->getConnectionPool()->getConnection("node-oracle");
+    baton->connection = conn;
+  } catch(oracle::occi::SQLException &ex) {
+      baton->error = new std::string(ex.getMessage());
+  }
+}
+
+
+void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
+  HandleScope scope;
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+
+  baton->connectionPool->Unref();
+
+  Handle<Value> argv[2];
+  if(baton->error) {
+    argv[0] = Exception::Error(String::New(baton->error->c_str()));
+    argv[1] = Undefined();
+  } else {
+    argv[0] = Undefined();
+    Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->environment, baton->connectionPool->getConnectionPool(), baton->connection);
+    argv[1] = connection;
+  }
+
+  v8::TryCatch tryCatch;
+  baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+  delete baton;
+
+  if (tryCatch.HasCaught()) {
+    node::FatalException(tryCatch);
+  }
+
+}
+
+void ConnectionPool::closeConnectionPool() {
+  if(m_environment && m_connectionPool) {
+    m_environment->terminateStatelessConnectionPool(m_connectionPool);
+    m_connectionPool = NULL;
+  }
+}
+
+
 Persistent<FunctionTemplate> Connection::constructorTemplate;
 
 void Connection::Init(Handle<Object> target) {
   HandleScope scope;
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  constructorTemplate = Persistent<FunctionTemplate>::New(t);
-  constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-  constructorTemplate->SetClassName(String::NewSymbol("Connection"));
+  Local<FunctionTemplate> t = FunctionTemplate::New(Connection::New);
+  Connection::constructorTemplate = Persistent<FunctionTemplate>::New(t);
+  Connection::constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  Connection::constructorTemplate->SetClassName(String::NewSymbol("Connection"));
 
-  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
-  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "executeSync", ExecuteSync);
-  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "close", Close);
-  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "isConnected", IsConnected);
-  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "setAutoCommit", SetAutoCommit);
-  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "commit", Commit);
-  NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "rollback", Rollback);
+  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "execute", Execute);
+  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "executeSync", ExecuteSync);
+  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "close", Connection::Close);
+  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "isConnected", IsConnected);
+  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "setAutoCommit", SetAutoCommit);
+  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "commit", Commit);
+  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "rollback", Rollback);
 
-  target->Set(String::NewSymbol("Connection"), constructorTemplate->GetFunction());
+  target->Set(String::NewSymbol("Connection"), Connection::constructorTemplate->GetFunction());
 }
 
 Handle<Value> Connection::New(const Arguments& args) {
@@ -149,7 +305,11 @@ Handle<Value> Connection::SetAutoCommit(const Arguments& args) {
 
 void Connection::closeConnection() {
   if(m_environment && m_connection) {
-    m_environment->terminateConnection(m_connection);
+    if(m_connectionPool) {
+      m_connectionPool->releaseConnection(m_connection, "node-oracle");
+    } else {
+      m_environment->terminateConnection(m_connection);
+    }
     m_connection = NULL;
   }
 }
@@ -788,9 +948,10 @@ try {
 
 }
 
-void Connection::setConnection(oracle::occi::Environment* environment, oracle::occi::Connection* connection) {
+void Connection::setConnection(oracle::occi::Environment* environment, oracle::occi::StatelessConnectionPool* connectionPool, oracle::occi::Connection* connection) {
   m_environment = environment;
   m_connection = connection;
+  m_connectionPool = connectionPool;
 }
 
 Handle<Value> Connection::ExecuteSync(const Arguments& args) {
