@@ -13,8 +13,8 @@ ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql, v8::Local<v8
     this->callback = Persistent<Function>::New(*callback);
   }
   this->outputs = new std::vector<output_t*>();
-  CopyValuesToBaton(this, values);
   this->error = NULL;
+  CopyValuesToBaton(this, values);
 }
 
 ExecuteBaton::~ExecuteBaton() {
@@ -128,9 +128,8 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
     // unhandled type
     else {
         //XXX leaks new value on error
-      std::ostringstream message;
-      message << "CopyValuesToBaton: Unhandled value type";
-      throw NodeOracleException(message.str());
+      baton->error = new string("CopyValuesToBaton: Unhandled value type");
+      // throw NodeOracleException(message.str());
     }
 
   }

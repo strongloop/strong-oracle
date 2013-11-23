@@ -213,11 +213,9 @@ Handle<Value> Connection::Execute(const Arguments& args) {
 
   String::AsciiValue sqlVal(sql);
 
-  ExecuteBaton* baton;
-  try {
-    baton = new ExecuteBaton(connection, *sqlVal, &values, &callback);
-  } catch(NodeOracleException &ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values, &callback);
+  if(baton->error != NULL) {
+    return scope.Close(ThrowException(Exception::Error(String::New(baton->error->c_str()))));
   }
 
   uv_work_t* req = new uv_work_t();
