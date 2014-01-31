@@ -1,6 +1,7 @@
 
-#include "oracle_bindings.h"
 #include "connection.h"
+#include "oracle_bindings.h"
+#include "reader.h"
 #include "outParam.h"
 #include <iostream>
 
@@ -9,9 +10,10 @@ Persistent<FunctionTemplate> OracleClient::s_ct;
 ConnectBaton::ConnectBaton(OracleClient* client, oracle::occi::Environment* environment, v8::Handle<v8::Function>* callback) {
   this->client = client;
   if(callback != NULL) {
-    this->callback = Persistent<Function>::New(*callback);
+    uni::Reset(this->callback, *callback);
   } else {
-    this->callback = Persistent<Function>();
+    // TODO: fix next line
+    //this->callback = Persistent<Function>();
   }
   this->environment = environment;
   this->error = NULL;
@@ -31,39 +33,64 @@ ConnectBaton::~ConnectBaton() {
 }
 
 void OracleClient::Init(Handle<Object> target) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
 
   Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  s_ct = Persistent<FunctionTemplate>::New(t);
-  s_ct->InstanceTemplate()->SetInternalFieldCount(1);
-  s_ct->SetClassName(String::NewSymbol("OracleClient"));
+  uni::Reset(s_ct, t);
+  uni::Deref(s_ct)->InstanceTemplate()->SetInternalFieldCount(1);
+  uni::Deref(s_ct)->SetClassName(String::NewSymbol("OracleClient"));
 
-  NODE_SET_PROTOTYPE_METHOD(s_ct, "connect", Connect);
-  NODE_SET_PROTOTYPE_METHOD(s_ct, "connectSync", ConnectSync);
-  NODE_SET_PROTOTYPE_METHOD(s_ct, "createConnectionPoolSync", CreateConnectionPoolSync);
-  NODE_SET_PROTOTYPE_METHOD(s_ct, "createConnectionPool", CreateConnectionPool);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(s_ct), "connect", Connect);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(s_ct), "connectSync", ConnectSync);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(s_ct), "createConnectionPoolSync", CreateConnectionPoolSync);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(s_ct), "createConnectionPool", CreateConnectionPool);
 
-  target->Set(String::NewSymbol("OracleClient"), s_ct->GetFunction());
+  target->Set(String::NewSymbol("OracleClient"), uni::Deref(s_ct)->GetFunction());
 }
 
-Handle<Value> OracleClient::New(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType OracleClient::New(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
+
+  /*
+  REQ_OBJECT_ARG(0, settings);
+
+  std:string hostname, user, password, database;
+  unsigned int port, minConn, maxConn, incrConn;
+
+  OBJ_GET_STRING(settings, "hostname", hostname);
+  OBJ_GET_STRING(settings, "user", user);
+  OBJ_GET_STRING(settings, "password", password);
+  OBJ_GET_STRING(settings, "database", database);
+  OBJ_GET_NUMBER(settings, "port", port, 1521);
+  OBJ_GET_NUMBER(settings, "minConn", minConn, 0);
+  OBJ_GET_NUMBER(settings, "maxConn", maxConn, 1);
+  OBJ_GET_NUMBER(settings, "incrConn", incrConn, 1);
+
+  std::ostringstream connectionStr;
+      connectionStr << "//" << hostname << ":" << port << "/" << database;
+  */
 
   OracleClient *client = new OracleClient();
   client->Wrap(args.This());
-  return scope.Close(args.This());
+  UNI_RETURN(scope, args, args.This());
 }
 
 OracleClient::OracleClient() {
   m_environment = oracle::occi::Environment::createEnvironment(oracle::occi::Environment::THREADED_MUTEXED);
+  /*
+  m_connectionPool = m_environment->createConnectionPool(user, password, connectString, minConn, maxConn, incrConn);
+  */
 }
 
 OracleClient::~OracleClient() {
+  /*
+  m_environment->terminateConnectionPool (connectionPool);
+  */
   oracle::occi::Environment::terminateEnvironment(m_environment);
 }
 
-Handle<Value> OracleClient::Connect(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType OracleClient::Connect(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
 
   REQ_OBJECT_ARG(0, settings);
   REQ_FUN_ARG(1, callback);
@@ -84,7 +111,7 @@ Handle<Value> OracleClient::Connect(const Arguments& args) {
   req->data = baton;
   uv_queue_work(uv_default_loop(), req, EIO_Connect, (uv_after_work_cb)EIO_AfterConnect);
 
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
 void OracleClient::EIO_Connect(uv_work_t* req) {
@@ -110,7 +137,7 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
 }
 
 void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
   ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
   baton->client->Unref();
 
@@ -120,22 +147,18 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+    Handle<Object> connection = uni::Deref(Connection::constructorTemplate)->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->client->m_environment, NULL, baton->connection);
     argv[1] = connection;
   }
 
-  v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
-  }
+  node::MakeCallback(Context::GetCurrent()->Global(), uni::Deref(baton->callback), 2, argv);
 
   delete baton;
 }
 
-Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType OracleClient::ConnectSync(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   REQ_OBJECT_ARG(0, settings);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
@@ -152,21 +175,21 @@ Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
     connectionStr << "//" << baton.hostname << ":" << baton.port << "/" << baton.database;
     baton.connection = baton.environment->createConnection(baton.user, baton.password, connectionStr.str());
   } catch(oracle::occi::SQLException &ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+    baton.error = new std::string(ex.getMessage());
+    UNI_THROW(Exception::Error(String::New(baton.error->c_str())));
   } catch (const std::exception& ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+    UNI_THROW(Exception::Error(String::New(ex.what())));
   }
 
-  Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
-      (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.client->m_environment, NULL, baton.connection);
+  Handle<Object> connection = uni::Deref(Connection::constructorTemplate)->GetFunction()->NewInstance();
+    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.client->m_environment, NULL, baton.connection);
 
-  return scope.Close(connection);
-
+  UNI_RETURN(scope, args, connection);
 }
 
 
-Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
-  HandleScope scope;
+Handle<Value> OracleClient::CreateConnectionPoolSync(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   REQ_OBJECT_ARG(0, settings);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
@@ -204,16 +227,16 @@ Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
     Handle<Object> connectionPool = ConnectionPool::connectionPoolConstructorTemplate->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
 
-    return scope.Close(connectionPool);
+    UNI_RETURN(scope, args, connectionPool);
   } catch(oracle::occi::SQLException &ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+    UNI_THROW(Exception::Error(String::New(ex.getMessage().c_str())));
   } catch (const std::exception& ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+    UNI_THROW(Exception::Error(String::New(ex.what())));
   }
 }
 
-Handle<Value> OracleClient::CreateConnectionPool(const Arguments& args) {
-  HandleScope scope;
+Handle<Value> OracleClient::CreateConnectionPool(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
 
   REQ_OBJECT_ARG(0, settings);
   REQ_FUN_ARG(1, callback);
@@ -243,7 +266,7 @@ Handle<Value> OracleClient::CreateConnectionPool(const Arguments& args) {
   req->data = baton;
   uv_queue_work(uv_default_loop(), req, EIO_CreateConnectionPool, (uv_after_work_cb)EIO_AfterCreateConnectionPool);
 
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
 void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
@@ -281,7 +304,8 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
 }
 
 void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
+
   ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
   baton->client->Unref();
 
@@ -291,27 +315,23 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Handle<Object> connectionPool = ConnectionPool::connectionPoolConstructorTemplate->GetFunction()->NewInstance();
+    Handle<Object> connectionPool =  uni::Deref(ConnectionPool::connectionPoolConstructorTemplate)->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(baton->client->m_environment, baton->connectionPool);
     argv[1] = connectionPool;
   }
 
-  v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
-  }
+  node::MakeCallback(Context::GetCurrent()->Global(), uni::Deref(baton->callback), 2, argv);
 
   delete baton;
+
 }
-
-
 
 extern "C" {
   static void init(Handle<Object> target) {
     OracleClient::Init(target);
     ConnectionPool::Init(target);
     Connection::Init(target);
+    Reader::Init(target);
     OutParam::Init(target);
   }
 

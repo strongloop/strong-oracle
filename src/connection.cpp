@@ -3,8 +3,8 @@
 #include "executeBaton.h"
 #include "commitBaton.h"
 #include "rollbackBaton.h"
+#include "reader.h"
 #include "outParam.h"
-#include "node_buffer.h"
 #include <vector>
 #include <node_version.h>
 #include <iostream>
@@ -12,28 +12,31 @@ using namespace std;
 
 Persistent<FunctionTemplate> ConnectionPool::connectionPoolConstructorTemplate;
 
+
 void ConnectionPool::Init(Handle<Object> target) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
 
   Local<FunctionTemplate> t = FunctionTemplate::New(ConnectionPool::New);
-  ConnectionPool::connectionPoolConstructorTemplate = Persistent<FunctionTemplate>::New(t);
-  ConnectionPool::connectionPoolConstructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-  ConnectionPool::connectionPoolConstructorTemplate->SetClassName(String::NewSymbol("ConnectionPool"));
+  uni::Reset(ConnectionPool::connectionPoolConstructorTemplate, t);
 
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnectionSync", ConnectionPool::GetConnectionSync);
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getConnection", ConnectionPool::GetConnection);
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "close", ConnectionPool::Close);
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::connectionPoolConstructorTemplate, "getInfo", ConnectionPool::GetInfo);
+  uni::Deref(ConnectionPool::connectionPoolConstructorTemplate)->InstanceTemplate()->SetInternalFieldCount(1);
+  uni::Deref(ConnectionPool::connectionPoolConstructorTemplate)->SetClassName(String::NewSymbol("ConnectionPool"));
 
-  target->Set(String::NewSymbol("ConnectionPool"), ConnectionPool::connectionPoolConstructorTemplate->GetFunction());
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(ConnectionPool::connectionPoolConstructorTemplate), "getConnectionSync", ConnectionPool::GetConnectionSync);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(ConnectionPool::connectionPoolConstructorTemplate), "getConnection", ConnectionPool::GetConnection);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(ConnectionPool::connectionPoolConstructorTemplate), "close", ConnectionPool::Close);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(ConnectionPool::connectionPoolConstructorTemplate), "getInfo", ConnectionPool::GetInfo);
+
+  target->Set(String::NewSymbol("ConnectionPool"), uni::Deref(ConnectionPool::connectionPoolConstructorTemplate)->GetFunction());
 }
 
-Handle<Value> ConnectionPool::New(const Arguments& args) {
-  HandleScope scope;
+Handle<Value> ConnectionPool::New(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
 
   ConnectionPool *connectionPool = new ConnectionPool();
   connectionPool->Wrap(args.This());
-  return scope.Close(args.This());
+
+  UNI_RETURN(scope, args, args.This());
 }
 
 ConnectionPool::ConnectionPool():m_connectionPool(NULL), m_environment(NULL) {
@@ -49,20 +52,20 @@ void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment, o
 }
 
 
-Handle<Value> ConnectionPool::Close(const Arguments& args) {
-  HandleScope scope;
+Handle<Value> ConnectionPool::Close(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   try {
-	  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
-	  connectionPool->closeConnectionPool();
+	ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+	connectionPool->closeConnectionPool();
 
-	  return scope.Close(Undefined());
+	UNI_RETURN(scope, args, Undefined());
   } catch (const exception& ex) {
-	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+    UNI_THROW(Exception::Error(String::New(ex.what())));
   }
 }
 
-Handle<Value> ConnectionPool::GetInfo(const Arguments& args) {
-  HandleScope scope;
+Handle<Value> ConnectionPool::GetInfo(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
   if(connectionPool->m_connectionPool) {
     Local<Object> obj = Object::New();
@@ -79,36 +82,31 @@ Handle<Value> ConnectionPool::GetInfo(const Arguments& args) {
 
     return scope.Close(obj);
   } else {
-    return scope.Close(Undefined());
+    UNI_RETURN(scope, args, Undefined());
   }
 }
 
-Handle<Value> ConnectionPool::GetConnectionSync(const Arguments& args) {
-  HandleScope scope;
+Handle<Value> ConnectionPool::GetConnectionSync(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   try {
 	  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
 	  // std::string tag = "node-oracle";
 	  oracle::occi::Connection *conn= connectionPool->getConnectionPool()->getConnection("node-oracle");
-      Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+      Handle<Object> connection = uni::Deref(Connection::constructorTemplate)->GetFunction()->NewInstance();
       (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(connectionPool->getEnvironment(), connectionPool->getConnectionPool(), conn);
-      return scope.Close(connection);
+      UNI_RETURN(scope, args, connection);
   } catch (const exception& ex) {
-	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+      UNI_THROW(Exception::Error(String::New(ex.what())));
   }
 }
 
-Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
-  HandleScope scope;
+Handle<Value> ConnectionPool::GetConnection(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
 
   REQ_FUN_ARG(0, callback);
 
-  ConnectionPoolBaton* baton;
-  try {
-    baton = new ConnectionPoolBaton(connectionPool->getEnvironment(), connectionPool, &callback);
-  } catch(NodeOracleException &ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
-  }
+  ConnectionPoolBaton* baton = new ConnectionPoolBaton(connectionPool->getEnvironment(), connectionPool, &callback);
 
   uv_work_t* req = new uv_work_t();
   req->data = baton;
@@ -116,7 +114,7 @@ Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
 
   connectionPool->Ref();
 
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
 void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
@@ -132,7 +130,7 @@ void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
 
 
 void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
   ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
 
   baton->connectionPool->Unref();
@@ -143,18 +141,13 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+    Handle<Object> connection = uni::Deref(Connection::constructorTemplate)->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->environment, baton->connectionPool->getConnectionPool(), baton->connection);
     argv[1] = connection;
   }
 
-  v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+  node::MakeCallback(Context::GetCurrent()->Global(), uni::Deref(baton->callback), 2, argv);
   delete baton;
-
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
-  }
 
 }
 
@@ -169,31 +162,33 @@ void ConnectionPool::closeConnectionPool() {
 Persistent<FunctionTemplate> Connection::constructorTemplate;
 
 void Connection::Init(Handle<Object> target) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(Connection::New);
-  Connection::constructorTemplate = Persistent<FunctionTemplate>::New(t);
-  Connection::constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-  Connection::constructorTemplate->SetClassName(String::NewSymbol("Connection"));
+  Local<FunctionTemplate> t = FunctionTemplate::New(New);
+  uni::Reset(constructorTemplate, t);
+  uni::Deref(constructorTemplate)->InstanceTemplate()->SetInternalFieldCount(1);
+  uni::Deref(constructorTemplate)->SetClassName(String::NewSymbol("Connection"));
 
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "execute", Execute);
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "executeSync", ExecuteSync);
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "close", Connection::Close);
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "isConnected", IsConnected);
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "setAutoCommit", SetAutoCommit);
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "setPrefetchRowCount", SetPrefetchRowCount);
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "commit", Commit);
-  NODE_SET_PROTOTYPE_METHOD(Connection::constructorTemplate, "rollback", Rollback);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "execute", Execute);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "executeSync", ExecuteSync);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "reader", CreateReader);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "close", Close);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "isConnected", IsConnected);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "setAutoCommit", SetAutoCommit);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "setPrefetchRowCount", SetPrefetchRowCount);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "commit", Commit);
+  NODE_SET_PROTOTYPE_METHOD(uni::Deref(constructorTemplate), "rollback", Rollback);
 
-  target->Set(String::NewSymbol("Connection"), Connection::constructorTemplate->GetFunction());
+  target->Set(String::NewSymbol("Connection"), uni::Deref(constructorTemplate)->GetFunction());
 }
 
-Handle<Value> Connection::New(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::New(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
 
   Connection *connection = new Connection();
   connection->Wrap(args.This());
-  return scope.Close(args.This());
+
+  UNI_RETURN(scope, args, args.This());
 }
 
 Connection::Connection():m_connection(NULL), m_environment(NULL), m_autoCommit(true), m_prefetchRowCount(0) {
@@ -203,19 +198,22 @@ Connection::~Connection() {
   closeConnection();
 }
 
-Handle<Value> Connection::Execute(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::Execute(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
   REQ_FUN_ARG(2, callback);
 
-  String::AsciiValue sqlVal(sql);
+  String::Utf8Value sqlVal(sql);
 
   ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values, &callback);
-  if(baton->error != NULL) {
-    return scope.Close(ThrowException(Exception::Error(String::New(baton->error->c_str()))));
+
+  if (baton->error) {
+    Local<String> message = String::New(baton->error->c_str());
+    delete baton;
+    UNI_THROW(Exception::Error(message));
   }
 
   uv_work_t* req = new uv_work_t();
@@ -224,44 +222,57 @@ Handle<Value> Connection::Execute(const Arguments& args) {
 
   connection->Ref();
 
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
-Handle<Value> Connection::Close(const Arguments& args) {
-  HandleScope scope;
-  try {
-	  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
-	  connection->closeConnection();
+uni::CallbackType Connection::CreateReader(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
+  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
-	  return scope.Close(Undefined());
+  REQ_STRING_ARG(0, sql);
+  REQ_ARRAY_ARG(1, values);
+
+  String::Utf8Value sqlVal(sql);
+
+  ReaderBaton* baton = new ReaderBaton(connection, *sqlVal, &values);
+
+  Local<Object> readerHandle(uni::Deref(Reader::constructorTemplate)->GetFunction()->NewInstance());
+  Reader* reader = ObjectWrap::Unwrap<Reader>(readerHandle);
+  reader->setBaton(baton);
+
+  UNI_RETURN(scope, args, readerHandle);
+}
+
+uni::CallbackType Connection::Close(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
+  try {
+    Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+    connection->closeConnection();
+
+    UNI_RETURN(scope, args, Undefined());
   } catch (const exception& ex) {
-	  return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+    UNI_THROW(Exception::Error(String::New(ex.what())));
   }
 }
 
-Handle<Value> Connection::IsConnected(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::IsConnected(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   if(connection && connection->m_connection) {
-    return scope.Close(Boolean::New(true));
+    UNI_RETURN(scope, args, Boolean::New(true));
   } else {
-    return scope.Close(Boolean::New(false));
+    UNI_RETURN(scope, args, Boolean::New(false));
   }
 }
 
-Handle<Value> Connection::Commit(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::Commit(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_FUN_ARG(0, callback);
 
-  CommitBaton* baton;
-  try {
-    baton = new CommitBaton(connection, &callback);
-  } catch(NodeOracleException &ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
-  }
+  CommitBaton* baton = new CommitBaton(connection, &callback);
 
   uv_work_t* req = new uv_work_t();
   req->data = baton;
@@ -269,21 +280,16 @@ Handle<Value> Connection::Commit(const Arguments& args) {
 
   connection->Ref();
 
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
-Handle<Value> Connection::Rollback(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::Rollback(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_FUN_ARG(0, callback);
 
-  RollbackBaton* baton;
-  try {
-    baton = new RollbackBaton(connection, &callback);
-  } catch(NodeOracleException &ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
-  }
+  RollbackBaton* baton = new RollbackBaton(connection, &callback);
 
   uv_work_t* req = new uv_work_t();
   req->data = baton;
@@ -291,33 +297,38 @@ Handle<Value> Connection::Rollback(const Arguments& args) {
 
   connection->Ref();
 
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
-Handle<Value> Connection::SetAutoCommit(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::SetAutoCommit(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
   REQ_BOOL_ARG(0, autoCommit);
   connection->m_autoCommit = autoCommit;
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
-Handle<Value> Connection::SetPrefetchRowCount(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::SetPrefetchRowCount(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
   REQ_INT_ARG(0, prefetchRowCount);
   connection->m_prefetchRowCount = prefetchRowCount;
-  return scope.Close(Undefined());
+  UNI_RETURN(scope, args, Undefined());
 }
 
 void Connection::closeConnection() {
   if(m_environment && m_connection) {
-    if(m_connectionPool) {
-      m_connectionPool->releaseConnection(m_connection, "node-oracle");
-    } else {
-      m_environment->terminateConnection(m_connection);
+    try {
+      if(m_connectionPool) {
+        m_connectionPool->releaseConnection(m_connection, "node-oracle");
+      } else {
+        m_environment->terminateConnection(m_connection);
+      }
+      m_connection = NULL;
+    } catch (oracle::occi::SQLException &ex) {
+        m_connection = NULL;
+        throw; // rethrow to allow caller to catch and rethrow in V8 scope
     }
-    m_connection = NULL;
   }
 }
 
@@ -325,7 +336,8 @@ void RandomBytesFree(char* data, void* hint) {
   delete[] data;
 }
 
-int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value_t*> &values) {
+int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, ExecuteBaton* baton) {
+  std::vector<value_t*> &values = baton->values;
   uint32_t index = 1;
   int outputParam = -1;
   OutParam * outParam = NULL;
@@ -343,8 +355,8 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value
       case VALUE_TYPE_NUMBER:
         stmt->setNumber(index, *((oracle::occi::Number*)val->value));
         break;
-      case VALUE_TYPE_DATE:
-        stmt->setDate(index, *((oracle::occi::Date*)val->value));
+      case VALUE_TYPE_TIMESTAMP:
+        stmt->setTimestamp(index, *((oracle::occi::Timestamp*)val->value));
         break;
       case VALUE_TYPE_OUTPUT:
         outParam = static_cast<OutParam*>(val->value);
@@ -398,28 +410,30 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value
               } else {
                 stmt->registerOutParam(index, oracle::occi::OCCINUMBER);
               }
-            break;
+              break;
             }
           case OutParam::OCCIBLOB:
             stmt->registerOutParam(index, oracle::occi::OCCIBLOB);
             break;
           default:
             {
-                ostringstream oss;
-                oss << "SetValuesOnStatement: Unknown OutParam type: " << outParamType;
-                throw NodeOracleException(oss.str());
+              ostringstream oss;
+              oss << "SetValuesOnStatement: Unknown OutParam type: " << outParamType;
+              baton->error = new std::string(oss.str());
+              return -2;
             }
         }
         outputParam = index;
         break;
       default:
-        throw NodeOracleException("SetValuesOnStatement: Unhandled value type");
+        baton->error = new std::string("SetValuesOnStatement: Unhandled value type");
+        return -2;
     }
   }
   return outputParam;
 }
 
-void Connection::CreateColumnsFromResultSet(oracle::occi::ResultSet* rs, vector<column_t*> &columns) {
+void Connection::CreateColumnsFromResultSet(oracle::occi::ResultSet* rs, ExecuteBaton* baton, vector<column_t*> &columns) {
   vector<oracle::occi::MetaData> metadata = rs->getColumnListMetaData();
   for (vector<oracle::occi::MetaData>::iterator iterator = metadata.begin(), end = metadata.end(); iterator != end; ++iterator) {
     oracle::occi::MetaData metadata = *iterator;
@@ -448,7 +462,7 @@ void Connection::CreateColumnsFromResultSet(oracle::occi::ResultSet* rs, vector<
       case oracle::occi::OCCI_TYPECODE_DATE:
         col->type = VALUE_TYPE_DATE;
         break;
-      //Use OCI_TYPECODE from oro.h because occiCommon.h does not re-export these in its TypeCode enum
+        //Use OCI_TYPECODE from oro.h because occiCommon.h does not re-export these in its TypeCode enum
       case OCI_TYPECODE_TIMESTAMP:
       case OCI_TYPECODE_TIMESTAMP_TZ: //Timezone
       case OCI_TYPECODE_TIMESTAMP_LTZ: //Local Timezone
@@ -457,18 +471,27 @@ void Connection::CreateColumnsFromResultSet(oracle::occi::ResultSet* rs, vector<
       case oracle::occi::OCCI_TYPECODE_BLOB:
         col->type = VALUE_TYPE_BLOB;
         break;
+      // The lines below are temporary mappings for RAW and ROWID types
+      // I need them to test because my test db has columns like this but this mapping will need to be reviewed
+      case 23: // see http://docs.oracle.com/cd/B14117_01/appdev.101/b10779/oci03typ.htm#421756
+        //printf("datatype 23 for column %s\n", col->name.c_str());
+        col->type = VALUE_TYPE_STRING;
+        break;
+      case 104: // rowid
+        col->type = VALUE_TYPE_STRING;
+        break;
       default:
         ostringstream message;
         message << "CreateColumnsFromResultSet: Unhandled oracle data type: " << type;
         delete col;
-        throw NodeOracleException(message.str());
-        break;
+        baton->error = new std::string(message.str());
+        return;
     }
     columns.push_back(col);
   }
 }
 
-row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs, vector<column_t*> &columns) {
+row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs, ExecuteBaton* baton, vector<column_t*> &columns) {
   row_t* row = new row_t();
   int colIndex = 1;
   for (vector<column_t*>::iterator iterator = columns.begin(), end = columns.end(); iterator != end; ++iterator, colIndex++) {
@@ -498,8 +521,9 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
         default:
           ostringstream message;
           message << "CreateRowFromCurrentResultSetRow: Unhandled type: " << col->type;
-          throw NodeOracleException(message.str());
-          break;
+          baton->error = new std::string(message.str());
+          delete row;
+          return NULL;
       }
     }
   }
@@ -513,20 +537,15 @@ void Connection::EIO_Commit(uv_work_t* req) {
 }
 
 void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
   CommitBaton* baton = static_cast<CommitBaton*>(req->data);
 
   baton->connection->Unref();
 
   Handle<Value> argv[2];
   argv[0] = Undefined();
-  v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 1, argv);
+  node::MakeCallback(Context::GetCurrent()->Global(), uni::Deref(baton->callback), 2, argv);
   delete baton;
-
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
-  }
 
 }
 
@@ -537,21 +556,15 @@ void Connection::EIO_Rollback(uv_work_t* req) {
 }
 
 void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
-  HandleScope scope;
+  UNI_SCOPE(scope);
   RollbackBaton* baton = static_cast<RollbackBaton*>(req->data);
 
   baton->connection->Unref();
 
   Handle<Value> argv[2];
   argv[0] = Undefined();
-  v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 1, argv);
+  node::MakeCallback(Context::GetCurrent()->Global(), uni::Deref(baton->callback), 2, argv);
   delete baton;
-
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
-  }
-
 }
 
 void Connection::EIO_Execute(uv_work_t* req) {
@@ -564,12 +577,14 @@ void Connection::EIO_Execute(uv_work_t* req) {
   oracle::occi::ResultSet* rs = NULL;
   try {
     if(! baton->connection->m_connection) {
-      throw NodeOracleException("Connection already closed");
+      baton->error = new std::string("Connection already closed");
+      return;
     }
     stmt = baton->connection->m_connection->createStatement(baton->sql);
     stmt->setAutoCommit(baton->connection->m_autoCommit);
     if (baton->connection->m_prefetchRowCount > 0) stmt->setPrefetchRowCount(baton->connection->m_prefetchRowCount);
-    int outputParam = SetValuesOnStatement(stmt, baton->values);
+    int outputParam = SetValuesOnStatement(stmt, baton);
+    if (baton->error) goto cleanup;
 
     int status = stmt->execute();
     if(status == oracle::occi::Statement::UPDATE_COUNT_AVAILABLE) {
@@ -579,71 +594,74 @@ void Connection::EIO_Execute(uv_work_t* req) {
           output_t* output = *iterator;
           oracle::occi::ResultSet* rs;
           switch(output->type) {
-          case OutParam::OCCIINT:
-            output->intVal = stmt->getInt(output->index); 
-            break;
-          case OutParam::OCCISTRING:
-            output->strVal = string(stmt->getString(output->index));
-            break;
-          case OutParam::OCCIDOUBLE:
-            output->doubleVal = stmt->getDouble(output->index);
-            break;
-          case OutParam::OCCIFLOAT:
-            output->floatVal = stmt->getFloat(output->index);
-            break;
-          case OutParam::OCCICURSOR:
-            rs = stmt->getCursor(output->index);
-            CreateColumnsFromResultSet(rs, output->columns);
-            output->rows = new vector<row_t*>();
-            while(rs->next()) {
-              row_t* row = CreateRowFromCurrentResultSetRow(rs, output->columns);
-              output->rows->push_back(row);
-            }
-            break;
-          case OutParam::OCCICLOB:
-            output->clobVal = stmt->getClob(output->index);
-            break;
-          case OutParam::OCCIBLOB:
-            output->blobVal = stmt->getBlob(output->index);
-            break;
-          case OutParam::OCCIDATE:
-            output->dateVal = stmt->getDate(output->index);
-            break;
-          case OutParam::OCCITIMESTAMP:
-            output->timestampVal = stmt->getTimestamp(output->index);
-            break;
-          case OutParam::OCCINUMBER:
-            output->numberVal = stmt->getNumber(output->index);
-            break;
-          default:
-            {
+            case OutParam::OCCIINT:
+              output->intVal = stmt->getInt(output->index);
+              break;
+            case OutParam::OCCISTRING:
+              output->strVal = string(stmt->getString(output->index));
+              break;
+            case OutParam::OCCIDOUBLE:
+              output->doubleVal = stmt->getDouble(output->index);
+              break;
+            case OutParam::OCCIFLOAT:
+              output->floatVal = stmt->getFloat(output->index);
+              break;
+            case OutParam::OCCICURSOR:
+              rs = stmt->getCursor(output->index);
+              CreateColumnsFromResultSet(rs, baton, output->columns);
+              if (baton->error) goto cleanup;
+              output->rows = new vector<row_t*>();
+              while(rs->next()) {
+                row_t* row = CreateRowFromCurrentResultSetRow(rs, baton, output->columns);
+                if (baton->error) goto cleanup;
+                output->rows->push_back(row);
+              }
+              break;
+            case OutParam::OCCICLOB:
+              output->clobVal = stmt->getClob(output->index);
+              break;
+            case OutParam::OCCIBLOB:
+              output->blobVal = stmt->getBlob(output->index);
+              break;
+            case OutParam::OCCIDATE:
+              output->dateVal = stmt->getDate(output->index);
+              break;
+            case OutParam::OCCITIMESTAMP:
+              output->timestampVal = stmt->getTimestamp(output->index);
+              break;
+            case OutParam::OCCINUMBER:
+              output->numberVal = stmt->getNumber(output->index);
+              break;
+            default:
+              {
                 ostringstream oss;
                 oss << "Unknown OutParam type: " << output->type;
-                throw NodeOracleException(oss.str());
-            }
+                baton->error = new std::string(oss.str());
+                goto cleanup;
+              }
           }
         }
       }
     } else if(status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
       rs = stmt->getResultSet();
-      CreateColumnsFromResultSet(rs, baton->columns);
+      CreateColumnsFromResultSet(rs, baton, baton->columns);
+      if (baton->error) goto cleanup;
       baton->rows = new vector<row_t*>();
 
       while(rs->next()) {
-        row_t* row = CreateRowFromCurrentResultSetRow(rs, baton->columns);
+        row_t* row = CreateRowFromCurrentResultSetRow(rs, baton, baton->columns);
+        if (baton->error) goto cleanup;
         baton->rows->push_back(row);
       }
     }
   } catch(oracle::occi::SQLException &ex) {
     baton->error = new string(ex.getMessage());
-  } catch(NodeOracleException &ex) {
-    baton->error = new string(ex.getMessage());
   } catch (const exception& ex) {
-	baton->error = new string(ex.what());
+    baton->error = new string(ex.what());
   } catch (...) {
     baton->error = new string("Unknown Error");
   }
-
+cleanup:
   if(stmt && rs) {
     stmt->closeResultSet(rs);
     rs = NULL;
@@ -663,40 +681,40 @@ void CallDateMethod(v8::Local<v8::Date> date, const char* methodName, int val) {
 }
 
 Local<Date> OracleDateToV8Date(oracle::occi::Date* d) {
-	int year;
-	unsigned int month, day, hour, min, sec;
-	d->getDate(year, month, day, hour, min, sec);
-	Local<Date> date = Date::Cast(*Date::New(0.0));
-	CallDateMethod(date, "setUTCMilliseconds", 0);
-	CallDateMethod(date, "setUTCSeconds", sec);
-	CallDateMethod(date, "setUTCMinutes", min);
-	CallDateMethod(date, "setUTCHours", hour);
-	CallDateMethod(date, "setUTCDate", day);
-	CallDateMethod(date, "setUTCMonth", month - 1);
-	CallDateMethod(date, "setUTCFullYear", year);
-	return date;
+  int year;
+  unsigned int month, day, hour, min, sec;
+  d->getDate(year, month, day, hour, min, sec);
+  Local<Date> date = uni::DateCast(Date::New(0.0));
+  CallDateMethod(date, "setUTCMilliseconds", 0);
+  CallDateMethod(date, "setUTCSeconds", sec);
+  CallDateMethod(date, "setUTCMinutes", min);
+  CallDateMethod(date, "setUTCHours", hour);
+  CallDateMethod(date, "setUTCDate", day);
+  CallDateMethod(date, "setUTCMonth", month - 1);
+  CallDateMethod(date, "setUTCFullYear", year);
+  return date;
 }
 
 Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
-	int year;
-	unsigned int month, day, hour, min, sec, fs, ms;
-	d->getDate(year, month, day);
-	d->getTime(hour, min, sec, fs);
-	Local<Date> date = Date::Cast(*Date::New(0.0));
-	//occi always returns nanoseconds, regardless of precision set on timestamp column
-	ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
+  int year;
+  unsigned int month, day, hour, min, sec, fs, ms;
+  d->getDate(year, month, day);
+  d->getTime(hour, min, sec, fs);
+  //occi always returns nanoseconds, regardless of precision set on timestamp column
+  ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
 
-	CallDateMethod(date, "setUTCMilliseconds", ms);
-	CallDateMethod(date, "setUTCSeconds", sec);
-	CallDateMethod(date, "setUTCMinutes", min);
-	CallDateMethod(date, "setUTCHours", hour);
-	CallDateMethod(date, "setUTCDate", day);
-	CallDateMethod(date, "setUTCMonth", month - 1);
-	CallDateMethod(date, "setUTCFullYear", year);
-	return date;
+  Local<Date> date = uni::DateCast(Date::New(0.0));
+  CallDateMethod(date, "setUTCMilliseconds", ms);
+  CallDateMethod(date, "setUTCSeconds", sec);
+  CallDateMethod(date, "setUTCMinutes", min);
+  CallDateMethod(date, "setUTCHours", hour);
+  CallDateMethod(date, "setUTCDate", day);
+  CallDateMethod(date, "setUTCMonth", month - 1);
+  CallDateMethod(date, "setUTCFullYear", year);
+  return date;
 }
 
-Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t* currentRow) {
+Local<Object> Connection::CreateV8ObjectFromRow(ExecuteBaton* baton, vector<column_t*> columns, row_t* currentRow) {
   Local<Object> obj = Object::New();
   uint32_t colIndex = 0;
   for (vector<column_t*>::iterator iterator = columns.begin(), end = columns.end(); iterator != end; ++iterator, colIndex++) {
@@ -740,17 +758,17 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
             v->open(oracle::occi::OCCI_LOB_READONLY);
 
             switch(col->charForm) {
-            case SQLCS_IMPLICIT:
-            	v->setCharSetForm(oracle::occi::OCCI_SQLCS_IMPLICIT);
+              case SQLCS_IMPLICIT:
+                v->setCharSetForm(oracle::occi::OCCI_SQLCS_IMPLICIT);
                 break;
-            case SQLCS_NCHAR:
-            	v->setCharSetForm(oracle::occi::OCCI_SQLCS_NCHAR);
+              case SQLCS_NCHAR:
+                v->setCharSetForm(oracle::occi::OCCI_SQLCS_NCHAR);
                 break;
-            case SQLCS_EXPLICIT:
-            	v->setCharSetForm(oracle::occi::OCCI_SQLCS_EXPLICIT);
+              case SQLCS_EXPLICIT:
+                v->setCharSetForm(oracle::occi::OCCI_SQLCS_EXPLICIT);
                 break;
-            case SQLCS_FLEXIBLE:
-            	v->setCharSetForm(oracle::occi::OCCI_SQLCS_FLEXIBLE);
+              case SQLCS_FLEXIBLE:
+                v->setCharSetForm(oracle::occi::OCCI_SQLCS_FLEXIBLE);
                 break;
             }
 
@@ -763,9 +781,9 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
             int numBytesRead = instream->readBuffer(buffer, chunkSize);
             int totalBytesRead = 0;
             while (numBytesRead != -1) {
-                totalBytesRead += numBytesRead;
-                columnVal.append(buffer);
-                numBytesRead = instream->readBuffer(buffer, chunkSize);
+              totalBytesRead += numBytesRead;
+              columnVal.append(buffer);
+              numBytesRead = instream->readBuffer(buffer, chunkSize);
             }
 
             v->closeStream(instream);
@@ -788,35 +806,36 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
             v->close();
 
             // convert to V8 buffer
-            node::Buffer *nodeBuff = node::Buffer::New(buffer, blobLength, RandomBytesFree, NULL);
+            uni::BufferType nodeBuff = node::Buffer::New(buffer, blobLength, RandomBytesFree, NULL);
             v8::Local<v8::Object> globalObj = v8::Context::GetCurrent()->Global();
             v8::Local<v8::Function> bufferConstructor = v8::Local<v8::Function>::Cast(globalObj->Get(v8::String::New("Buffer")));
-            v8::Handle<v8::Value> constructorArgs[3] = { nodeBuff->handle_, v8::Integer::New(blobLength), v8::Integer::New(0) };
+            v8::Handle<v8::Value> constructorArgs[3] = { uni::BufferToHandle(nodeBuff), v8::Integer::New(blobLength), v8::Integer::New(0) };
             v8::Local<v8::Object> v8Buffer = bufferConstructor->NewInstance(3, constructorArgs);
             obj->Set(String::New(col->name.c_str()), v8Buffer);
             delete v;
-            delete[] buffer;            
+            delete[] buffer;
             break;
           }
           break;
         default:
           ostringstream oss;
           oss << "CreateV8ObjectFromRow: Unhandled type: " << col->type;
-          throw NodeOracleException(oss.str());
-          break;
+          baton->error = new std::string(oss.str());
+          return obj;
       }
     }
   }
   return obj;
 }
 
-Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns, vector<row_t*>* rows) {
+Local<Array> Connection::CreateV8ArrayFromRows(ExecuteBaton* baton, vector<column_t*> columns, vector<row_t*>* rows) {
   size_t totalRows = rows->size();
   Local<Array> retRows = Array::New(totalRows);
   uint32_t index = 0;
   for (vector<row_t*>::iterator iterator = rows->begin(), end = rows->end(); iterator != end; ++iterator, index++) {
     row_t* currentRow = *iterator;
-    Local<Object> obj = CreateV8ObjectFromRow(columns, currentRow);
+    Local<Object> obj = CreateV8ObjectFromRow(baton, columns, currentRow);
+    if (baton->error) return retRows;
     retRows->Set(index, obj);
   }
   return retRows;
@@ -824,54 +843,50 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns, vector
 
 void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
 
-  HandleScope scope;
+  UNI_SCOPE(scope);
   ExecuteBaton* baton = static_cast<ExecuteBaton*>(req->data);
 
   baton->connection->Unref();
   try {
     Handle<Value> argv[2];
     handleResult(baton, argv);
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-  } catch(NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
-    argv[1] = Undefined();
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    node::MakeCallback(Context::GetCurrent()->Global(), uni::Deref(baton->callback), 2, argv);
   } catch(const exception &ex) {
-	    Handle<Value> argv[2];
-	    argv[0] = Exception::Error(String::New(ex.what()));
-	    argv[1] = Undefined();
-	    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    Handle<Value> argv[2];
+    argv[0] = Exception::Error(String::New(ex.what()));
+    argv[1] = Undefined();
+    node::MakeCallback(Context::GetCurrent()->Global(), uni::Deref(baton->callback), 2, argv);
   }
 
   delete baton;
 }
 
 void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
-try {
-    if(baton->error) {
-      argv[0] = Exception::Error(String::New(baton->error->c_str()));
-      argv[1] = Undefined();
+  if(baton->error) {
+failed:
+    argv[0] = Exception::Error(String::New(baton->error->c_str()));
+    argv[1] = Undefined();
+  } else {
+    argv[0] = Undefined();
+    if(baton->rows) {
+      argv[1] = CreateV8ArrayFromRows(baton, baton->columns, baton->rows);
+      if (baton->error) goto failed; // delete argv[1] ??
     } else {
-      argv[0] = Undefined();
-      if(baton->rows) {
-        argv[1] = CreateV8ArrayFromRows(baton->columns, baton->rows);
-      } else {
-        Local<Object> obj = Object::New();
-        obj->Set(String::New("updateCount"), Integer::New(baton->updateCount));
+      Local<Object> obj = Object::New();
+      obj->Set(String::New("updateCount"), Integer::New(baton->updateCount));
 
-        /* Note: attempt to keep backward compatability here: existing users of this library will have code that expects a single out param
-                 called 'returnParam'. For multiple out params, the first output will continue to be called 'returnParam' and subsequent outputs
-                 will be called 'returnParamX'.
-        */
-        uint32_t index = 0;
-        for (vector<output_t*>::iterator iterator = baton->outputs->begin(), end = baton->outputs->end(); iterator != end; ++iterator, index++) {
-          output_t* output = *iterator;
-          stringstream ss;
-          ss << "returnParam";
-          if(index > 0) ss << index;
-          string returnParam(ss.str());
-          switch(output->type) {
+      /* Note: attempt to keep backward compatability here: existing users of this library will have code that expects a single out param
+         called 'returnParam'. For multiple out params, the first output will continue to be called 'returnParam' and subsequent outputs
+         will be called 'returnParamX'.
+         */
+      uint32_t index = 0;
+      for (vector<output_t*>::iterator iterator = baton->outputs->begin(), end = baton->outputs->end(); iterator != end; ++iterator, index++) {
+        output_t* output = *iterator;
+        stringstream ss;
+        ss << "returnParam";
+        if(index > 0) ss << index;
+        string returnParam(ss.str());
+        switch(output->type) {
           case OutParam::OCCIINT:
             obj->Set(String::New(returnParam.c_str()), Integer::New(output->intVal));
             break;
@@ -885,21 +900,29 @@ try {
             obj->Set(String::New(returnParam.c_str()), Number::New(output->floatVal));
             break;
           case OutParam::OCCICURSOR:
-            obj->Set(String::New(returnParam.c_str()), CreateV8ArrayFromRows(output->columns, output->rows));
+            obj->Set(String::New(returnParam.c_str()), CreateV8ArrayFromRows(baton, output->columns, output->rows));
+            if (baton->error) goto failed;
             break;
           case OutParam::OCCICLOB:
             {
               output->clobVal.open(oracle::occi::OCCI_LOB_READONLY);
-              int lobLength = output->clobVal.length();
-              oracle::occi::Stream* instream = output->clobVal.getStream(1,0);
-              char *buffer = new char[lobLength];
-              memset(buffer, 0, lobLength);
-              instream->readBuffer(buffer, lobLength);
-              output->clobVal.closeStream(instream);
-              output->clobVal.close();
-              obj->Set(String::New(returnParam.c_str()), String::New(buffer, lobLength));
-              delete [] buffer;
-              break;
+      				oracle::occi::Stream* instream = output->clobVal.getStream(1,0);
+      				size_t chunkSize = output->clobVal.getChunkSize();
+      				char *buffer = new char[chunkSize];
+      				memset(buffer, 0, chunkSize);
+      				std::string clobVal;
+      				int numBytesRead = instream->readBuffer(buffer, chunkSize);
+      				int totalBytesRead = 0;
+      				while (numBytesRead != -1) {
+      					totalBytesRead += numBytesRead;
+      					clobVal.append(buffer);
+      					numBytesRead = instream->readBuffer(buffer, chunkSize);
+      				}
+      				output->clobVal.closeStream(instream);
+      				output->clobVal.close();
+      				obj->Set(String::New(returnParam.c_str()), String::New(clobVal.c_str(), totalBytesRead));				
+      				delete [] buffer;
+      				break;
             }
           case OutParam::OCCIBLOB:
             {
@@ -913,10 +936,10 @@ try {
               output->blobVal.close();
 
               // convert to V8 buffer
-              node::Buffer *nodeBuff = node::Buffer::New(buffer, lobLength, RandomBytesFree, NULL);
+              uni::BufferType nodeBuff = node::Buffer::New(buffer, lobLength, RandomBytesFree, NULL);
               v8::Local<v8::Object> globalObj = v8::Context::GetCurrent()->Global();
               v8::Local<v8::Function> bufferConstructor = v8::Local<v8::Function>::Cast(globalObj->Get(v8::String::New("Buffer")));
-              v8::Handle<v8::Value> constructorArgs[3] = { nodeBuff->handle_, v8::Integer::New(lobLength), v8::Integer::New(0) };
+              v8::Handle<v8::Value> constructorArgs[3] = { uni::BufferToHandle(nodeBuff), v8::Integer::New(lobLength), v8::Integer::New(0) };
               v8::Local<v8::Object> v8Buffer = bufferConstructor->NewInstance(3, constructorArgs);
               obj->Set(String::New(returnParam.c_str()), v8Buffer);
               delete [] buffer;
@@ -933,27 +956,16 @@ try {
             break;
           default:
             {
-                 ostringstream oss;
-                 oss << "Unknown OutParam type: " << output->type;
-                 throw NodeOracleException(oss.str());
-             }
-          }
+              ostringstream oss;
+              oss << "Unknown OutParam type: " << output->type;
+              baton->error = new std::string(oss.str());
+              goto failed;
+            }
         }
-        argv[1] = obj;
       }
+      argv[1] = obj;
     }
-  } catch(NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
-    argv[1] = Undefined();
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-  } catch(const std::exception &ex) {
-	    Handle<Value> argv[2];
-	    argv[0] = Exception::Error(String::New(ex.what()));
-	    argv[1] = Undefined();
-	    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
   }
-
 }
 
 void Connection::setConnection(oracle::occi::Environment* environment, oracle::occi::StatelessConnectionPool* connectionPool, oracle::occi::Connection* connection) {
@@ -962,20 +974,20 @@ void Connection::setConnection(oracle::occi::Environment* environment, oracle::o
   m_connectionPool = connectionPool;
 }
 
-Handle<Value> Connection::ExecuteSync(const Arguments& args) {
-  HandleScope scope;
+uni::CallbackType Connection::ExecuteSync(const uni::FunctionCallbackInfo& args) {
+  UNI_SCOPE(scope);
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
 
-  String::AsciiValue sqlVal(sql);
+  String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton;
-  try {
-    baton = new ExecuteBaton(connection, *sqlVal, &values, NULL);
-  } catch(NodeOracleException &ex) {
-    return ThrowException(Exception::Error(String::New(ex.getMessage().c_str())));
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values, NULL);
+  if (baton->error) {
+    Local<String> message = String::New(baton->error->c_str());
+    delete baton;
+    UNI_THROW(Exception::Error(message));
   }
 
   uv_work_t* req = new uv_work_t();
@@ -989,9 +1001,9 @@ Handle<Value> Connection::ExecuteSync(const Arguments& args) {
 
   if(baton->error) {
     delete baton;
-    return scope.Close(ThrowException(argv[0]));
+    UNI_THROW(argv[0]);
   }
 
   delete baton;
-  return scope.Close(argv[1]);
+  UNI_RETURN(scope, args, argv[1]);
 }

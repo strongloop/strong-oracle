@@ -126,8 +126,7 @@ exports['IntegrationTest'] = nodeunit.testCase({
           test.equal(results[0]['TNCHAR'], "tnchar value                                                                                                                                                                                                                                                   ");
           test.equal(results[0]['TNUMBER'], 42.5);
           test.equal(results[0]['TDATE'].getTime(), date1.getTime());
-          var date2Timestamp = new Date(2011, 11, 1, 0, 0, 0); // same as date2 but without time
-          test.equal(results[0]['TTIMESTAMP'].getTime(), date2Timestamp.getTime());
+          test.equal(results[0]['TTIMESTAMP'].getTime(), date2.getTime());
           test.equal(results[0]['TCLOB'], "tclob value");
           test.equal(results[0]['TNCLOB'], "tnclob value");
           // todo: test.equal(results[0]['TBLOB'], null);
@@ -175,5 +174,40 @@ exports['IntegrationTest'] = nodeunit.testCase({
           test.done();
         });
       });
-  } 
+  },
+
+  "date_types_insert_milliseconds": function(test) {
+    var self = this,
+        date = new Date(2013, 11, 24, 1, 2, 59, 999);
+
+    self.connection.execute(
+      "INSERT INTO datatype_test (tdate, ttimestamp) VALUES (:1, :2)",
+      [date, date],
+      function(err, results) {
+        if(err) { console.error(err); return; }
+        test.ok(results.updateCount === 1);
+
+        self.connection.execute("SELECT tdate, ttimestamp FROM datatype_test", [], function(err, results) {
+          if(err) { console.error(err); return; }
+          test.equal(results.length, 1);
+          dateWithoutMs = new Date(date);
+          dateWithoutMs.setMilliseconds(0);
+          test.equal(results[0]['TDATE'].getTime(), dateWithoutMs.getTime(), "Milliseconds should not be stored for DATE");
+          test.equal(results[0]['TTIMESTAMP'].getTime(), date.getTime(), "Milliseconds should be stored for TIMESTAMP");
+          test.done();
+        });
+      });
+  },
+
+  "utf8_chars_in_query": function(test) {
+    var self = this,
+        cyrillicString = "тест";
+
+    self.connection.execute("SELECT '" + cyrillicString + "' as test FROM DUAL", [], function(err, results) {
+      if(err) { console.error(err); return; }
+      test.equal(results.length, 1);
+      test.equal(results[0]['TEST'], cyrillicString, "UTF8 characters in sql query should be preserved");
+      test.done();
+    });
+  }
 });

@@ -1,8 +1,7 @@
 
 #include "executeBaton.h"
-#include "outParam.h"
-#include "nodeOracleException.h"
 #include "connection.h"
+#include "outParam.h"
 #include <iostream>
 using namespace std;
 
@@ -10,7 +9,7 @@ ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql, v8::Local<v8
   this->connection = connection;
   this->sql = sql;
   if(callback!=NULL) {
-    this->callback = Persistent<Function>::New(*callback);
+    uni::Reset(this->callback, *callback);
   }
   this->outputs = new std::vector<output_t*>();
   this->error = NULL;
@@ -60,14 +59,15 @@ double CallDateMethod(v8::Local<v8::Date> date, const char* methodName) {
   return Local<Number>::Cast(result)->Value();
 }
 
-oracle::occi::Date* V8DateToOcciDate(oracle::occi::Environment* env, v8::Local<v8::Date> val) {
-  int year = CallDateMethod(val, "getFullYear");
-  int month = CallDateMethod(val, "getMonth") + 1;
-  int day = CallDateMethod(val, "getDate");
-  int hours = CallDateMethod(val, "getHours");
-  int minutes = CallDateMethod(val, "getMinutes");
-  int seconds = CallDateMethod(val, "getSeconds");
-  oracle::occi::Date* d = new oracle::occi::Date(env, year, month, day, hours, minutes, seconds);
+oracle::occi::Timestamp* V8DateToOcciDate(oracle::occi::Environment* env, v8::Local<v8::Date> val) {
+  int year = CallDateMethod(val, "getUTCFullYear");
+  int month = CallDateMethod(val, "getUTCMonth") + 1;
+  int day = CallDateMethod(val, "getUTCDate");
+  int hours = CallDateMethod(val, "getUTCHours");
+  int minutes = CallDateMethod(val, "getUTCMinutes");
+  int seconds = CallDateMethod(val, "getUTCSeconds");
+  int fs = CallDateMethod(val, "getUTCMilliseconds") * 1000000; // occi::Timestamp() wants nanoseconds
+  oracle::occi::Timestamp* d = new oracle::occi::Timestamp(env, year, month, day, hours, minutes, seconds, fs);
   return d;
 }
 
@@ -95,8 +95,8 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
 
     // date
     else if(val->IsDate()) {
-      value->type = VALUE_TYPE_DATE;
-      value->value = V8DateToOcciDate(baton->connection->getEnvironment(), v8::Date::Cast(*val));
+      value->type = VALUE_TYPE_TIMESTAMP;
+      value->value = V8DateToOcciDate(baton->connection->getEnvironment(), uni::DateCast(val));
       baton->values.push_back(value);
     }
 
@@ -109,11 +109,12 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
     }
 
     // output
-    else if(val->IsObject() && val->ToObject()->FindInstanceInPrototypeChain(OutParam::constructorTemplate) != v8::Null()) {
+    else if(val->IsObject() && val->ToObject()->FindInstanceInPrototypeChain(uni::Deref(OutParam::constructorTemplate)) != v8::Null()) {
       OutParam* op = node::ObjectWrap::Unwrap<OutParam>(val->ToObject());
 
       // [rfeng] The OutParam object will be destructed. We need to create a new copy.
       OutParam* p = new OutParam(*op);
+
       value->type = VALUE_TYPE_OUTPUT;
       value->value = p; 
       baton->values.push_back(value);
@@ -124,12 +125,13 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
       output->index = i + 1;
       baton->outputs->push_back(output);
     }
-
     // unhandled type
     else {
         //XXX leaks new value on error
-      baton->error = new string("CopyValuesToBaton: Unhandled value type");
-      // throw NodeOracleException(message.str());
+      std::ostringstream message;
+      message << "CopyValuesToBaton: Unhandled value type: " << (val->IsUndefined() ? "undefined" : "unknown");
+      baton->error = new std::string(message.str());
+      return;
     }
 
   }
