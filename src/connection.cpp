@@ -164,7 +164,8 @@ Persistent<FunctionTemplate> Connection::constructorTemplate;
 void Connection::Init(Handle<Object> target) {
   UNI_SCOPE(scope);
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
+  Local<FunctionTemplate> t = FunctionTemplate::New(Connection::New);
+
   uni::Reset(constructorTemplate, t);
   uni::Deref(constructorTemplate)->InstanceTemplate()->SetInternalFieldCount(1);
   uni::Deref(constructorTemplate)->SetClassName(String::NewSymbol("Connection"));

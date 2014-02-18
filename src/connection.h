@@ -157,7 +157,7 @@ public:
   ConnectionPoolBaton(oracle::occi::Environment* environment, ConnectionPool* connectionPool, v8::Handle<v8::Function>* callback) {
     this->environment = environment;
     this->connectionPool = connectionPool;
-    this->callback = Persistent<Function>::New(*callback);
+    uni::Reset(this->callback, *callback);
     this->connection = NULL;
   }
 
