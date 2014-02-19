@@ -7,6 +7,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+// emulate snprintf() on windows, _snprintf() doesn't zero-terminate the buffer
+// on overflow...
+#include <stdarg.h>
+inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int n = _vsprintf_p(buf, len, fmt, ap);
+  if (len)
+    buf[len - 1] = '\0';
+  va_end(ap);
+  return n;
+}
+#endif
+
 #define REQ_BOOL_ARG(I, VAR)                                                                         \
   if (args.Length() <= (I) || !args[I]->IsBoolean())                                                 \
     return ThrowException(Exception::TypeError(String::New("Argument " #I " must be a bool")));      \
