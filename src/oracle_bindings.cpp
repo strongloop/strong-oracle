@@ -93,13 +93,14 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
   baton->error = NULL;
 
   try {
-    std::ostringstream connectionStr;
+    char connectionStr[512];
     if (baton->tns != "") {
-      connectionStr << baton->tns;
+      snprintf(connectionStr, sizeof(connectionStr), "%s", baton->tns.c_str());
     } else {
-      connectionStr << "//" << baton->hostname << ":" << baton->port << "/" << baton->database;
+      snprintf(connectionStr, sizeof(connectionStr), "//%s:%d/%s", baton->hostname.c_str(), baton->port, baton->database.c_str());
     }
-    baton->connection = baton->environment->createConnection(baton->user, baton->password, connectionStr.str());
+    std::string connStr = std::string(connectionStr);
+    baton->connection = baton->environment->createConnection(baton->user, baton->password, connStr);
   } catch(oracle::occi::SQLException &ex) {
     baton->error = new std::string(ex.getMessage());
   } catch (const std::exception& ex) {
@@ -148,9 +149,10 @@ Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
   OBJ_GET_NUMBER(settings, "port", baton.port, 1521);
 
   try {
-    std::ostringstream connectionStr;
-    connectionStr << "//" << baton.hostname << ":" << baton.port << "/" << baton.database;
-    baton.connection = baton.environment->createConnection(baton.user, baton.password, connectionStr.str());
+    char connectionStr[512];
+    snprintf(connectionStr, sizeof(connectionStr), "//%s:%d/%s", baton.hostname.c_str(), baton.port, baton.database.c_str());
+    std::string connStr = std::string(connectionStr);
+    baton.connection = baton.environment->createConnection(baton.user, baton.password, connStr);
   } catch(oracle::occi::SQLException &ex) {
     return scope.Close(ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
   } catch (const std::exception& ex) {
@@ -187,15 +189,15 @@ Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
   OBJ_GET_STRING(settings, "tns", tns);
 
   try {
-    std::ostringstream connectionStr;
+    char connectionStr[512];
     if (tns != "") {
-      connectionStr << tns;
+      snprintf(connectionStr, sizeof(connectionStr), "%s", tns.c_str());
     } else {
-      connectionStr << "//" << hostname << ":" << port << "/" << database;
+      snprintf(connectionStr, sizeof(connectionStr), "//%s:%d/%s", hostname.c_str(), port, database.c_str());
     }
-
+    std::string connStr = std::string(connectionStr);
     oracle::occi::StatelessConnectionPool *scp = client->m_environment->createStatelessConnectionPool(
-                                    user, password, connectionStr.str(), maxConn,
+                                    user, password, connStr, maxConn,
                                     minConn, incrConn,
                                     oracle::occi::StatelessConnectionPool::HOMOGENEOUS);
     scp->setTimeOut(timeout);
@@ -252,17 +254,17 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
   baton->error = NULL;
 
   try {
-    std::ostringstream connectionStr;
+    char connectionStr[512];
     if (baton->tns != "") {
-      connectionStr << baton->tns;
+      snprintf(connectionStr, sizeof(connectionStr), "%s", baton->tns.c_str());
     } else {
-      connectionStr << "//" << baton->hostname << ":" << baton->port << "/" << baton->database;
+      snprintf(connectionStr, sizeof(connectionStr), "//%s:%d/%s", baton->hostname.c_str(), baton->port, baton->database.c_str());
     }
-
+    std::string connStr = std::string(connectionStr);
     oracle::occi::StatelessConnectionPool *scp = baton->environment->createStatelessConnectionPool(
                                     baton->user,
                                     baton->password,
-                                    connectionStr.str(),
+                                    connStr,
                                     baton->maxConn,
                                     baton->minConn,
                                     baton->incrConn,

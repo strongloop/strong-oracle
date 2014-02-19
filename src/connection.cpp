@@ -348,7 +348,6 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value
         break;
       case VALUE_TYPE_OUTPUT:
         outParam = static_cast<OutParam*>(val->value);
-        // std::cout << "OutParam B: " << outParam << " "<< outParam->type() << " " << outParam->_inOut.hasInParam << std::endl;
         outParamType = outParam->type();
         switch(outParamType) {
           case OutParam::OCCIINT:
@@ -404,11 +403,10 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt, vector<value
             stmt->registerOutParam(index, oracle::occi::OCCIBLOB);
             break;
           default:
-            {
-                ostringstream oss;
-                oss << "SetValuesOnStatement: Unknown OutParam type: " << outParamType;
-                throw NodeOracleException(oss.str());
-            }
+            char msg[128];
+            snprintf(msg, sizeof(msg), "SetValuesOnStatement: Unknown OutParam type: %d", outParamType);
+            std::string strMsg = std::string(msg);
+            throw NodeOracleException(strMsg);
         }
         outputParam = index;
         break;
@@ -458,10 +456,11 @@ void Connection::CreateColumnsFromResultSet(oracle::occi::ResultSet* rs, vector<
         col->type = VALUE_TYPE_BLOB;
         break;
       default:
-        ostringstream message;
-        message << "CreateColumnsFromResultSet: Unhandled oracle data type: " << type;
+        char msg[128];
+        snprintf(msg, sizeof(msg), "CreateColumnsFromResultSet: Unhandled oracle data type: %d", type);
         delete col;
-        throw NodeOracleException(message.str());
+        std::string strMsg = std::string(msg);
+        throw NodeOracleException(strMsg);
         break;
     }
     columns.push_back(col);
@@ -496,9 +495,10 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
           row->values.push_back(new oracle::occi::Blob(rs->getBlob(colIndex)));
           break;
         default:
-          ostringstream message;
-          message << "CreateRowFromCurrentResultSetRow: Unhandled type: " << col->type;
-          throw NodeOracleException(message.str());
+          char msg[128];
+          snprintf(msg, sizeof(msg), "CreateRowFromCurrentResultSetRow: Unhandled type: %d", col->type);
+          std::string strMsg = std::string(msg);
+          throw NodeOracleException(strMsg);
           break;
       }
     }
@@ -616,11 +616,11 @@ void Connection::EIO_Execute(uv_work_t* req) {
             output->numberVal = stmt->getNumber(output->index);
             break;
           default:
-            {
-                ostringstream oss;
-                oss << "Unknown OutParam type: " << output->type;
-                throw NodeOracleException(oss.str());
-            }
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Unknown OutParam type: %d", output->type);
+            std::string strMsg = std::string(msg);
+            throw NodeOracleException(strMsg);
+            break;
           }
         }
       }
@@ -800,9 +800,10 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns, row_t
           }
           break;
         default:
-          ostringstream oss;
-          oss << "CreateV8ObjectFromRow: Unhandled type: " << col->type;
-          throw NodeOracleException(oss.str());
+          char msg[128];
+          snprintf(msg, sizeof(msg), "reateV8ObjectFromRow: Unhandled type: %d", col->type);
+          std::string strMsg = std::string(msg);
+          throw NodeOracleException(strMsg);
           break;
       }
     }
@@ -867,10 +868,13 @@ try {
         uint32_t index = 0;
         for (vector<output_t*>::iterator iterator = baton->outputs->begin(), end = baton->outputs->end(); iterator != end; ++iterator, index++) {
           output_t* output = *iterator;
-          stringstream ss;
-          ss << "returnParam";
-          if(index > 0) ss << index;
-          string returnParam(ss.str());
+          char msg[256];
+          if(index > 0) {
+            snprintf(msg, sizeof(msg), "returnParam%d", index);
+          } else {
+            snprintf(msg, sizeof(msg), "returnParam");
+          }
+          std::string returnParam(msg);
           switch(output->type) {
           case OutParam::OCCIINT:
             obj->Set(String::New(returnParam.c_str()), Integer::New(output->intVal));
@@ -932,11 +936,11 @@ try {
             obj->Set(String::New(returnParam.c_str()), Number::New(output->numberVal));
             break;
           default:
-            {
-                 ostringstream oss;
-                 oss << "Unknown OutParam type: " << output->type;
-                 throw NodeOracleException(oss.str());
-             }
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Unknown OutParam type: %d", output->type);
+            std::string strMsg = std::string(msg);
+            throw NodeOracleException(strMsg);
+            break;
           }
         }
         argv[1] = obj;
