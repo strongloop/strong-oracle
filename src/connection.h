@@ -79,7 +79,7 @@ public:
   static void EIO_GetConnection(uv_work_t* req);
   static void EIO_AfterGetConnection(uv_work_t* req, int status);
 
-  void closeConnectionPool();
+  void closeConnectionPool(oracle::occi::StatelessConnectionPool::DestroyMode mode=oracle::occi::StatelessConnectionPool::DEFAULT);
 
   ConnectionPool();
   ~ConnectionPool();

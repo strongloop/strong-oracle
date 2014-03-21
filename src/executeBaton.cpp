@@ -75,7 +75,6 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
     //XXX cache Length()
   for(uint32_t i=0; i<(*values)->Length(); i++) {
     v8::Local<v8::Value> val = (*values)->Get(i);
-
     value_t *value = new value_t();
 
     // null
@@ -84,6 +83,7 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
       value->value = NULL;
       baton->values.push_back(value);
     }
+
 
     // string
     else if(val->IsString()) {
@@ -106,6 +106,16 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* 
       double d = v8::Number::Cast(*val)->Value();
       value->value = new oracle::occi::Number(d); // XXX not deleted in dtor
       baton->values.push_back(value);
+    }
+
+    // Buffer
+    else if(node::Buffer::HasInstance(val)) {
+        value->type = VALUE_TYPE_CLOB;
+        Local<Object> buffer = val->ToObject();
+        size_t length = node::Buffer::Length(buffer);
+        const char *data = node::Buffer::Data(buffer);
+        value->value = node::Buffer::New(data, length);
+        baton->values.push_back(value);
     }
 
     // output

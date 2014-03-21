@@ -53,7 +53,12 @@ Handle<Value> ConnectionPool::Close(const Arguments& args) {
   HandleScope scope;
   try {
 	  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
-	  connectionPool->closeConnectionPool();
+	  oracle::occi::StatelessConnectionPool::DestroyMode mode = oracle::occi::StatelessConnectionPool::DEFAULT;
+	  if (args.Length() == 1 || args[0]->IsUint32()) {
+	    mode = static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(args[0]->Uint32Value());
+	  }
+
+	  connectionPool->closeConnectionPool(mode);
 
 	  return scope.Close(Undefined());
   } catch (const exception& ex) {
@@ -87,8 +92,8 @@ Handle<Value> ConnectionPool::GetConnectionSync(const Arguments& args) {
   HandleScope scope;
   try {
 	  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
-	  // std::string tag = "node-oracle";
-	  oracle::occi::Connection *conn= connectionPool->getConnectionPool()->getConnection("node-oracle");
+	  // std::string tag = "strong-oracle";
+	  oracle::occi::Connection *conn= connectionPool->getConnectionPool()->getConnection("strong-oracle");
       Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
       (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(connectionPool->getEnvironment(), connectionPool->getConnectionPool(), conn);
       return scope.Close(connection);
@@ -123,7 +128,7 @@ void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
   ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
   baton->error = NULL;
   try {
-    oracle::occi::Connection *conn= baton->connectionPool->getConnectionPool()->getConnection("node-oracle");
+    oracle::occi::Connection *conn= baton->connectionPool->getConnectionPool()->getConnection("strong-oracle");
     baton->connection = conn;
   } catch(oracle::occi::SQLException &ex) {
       baton->error = new std::string(ex.getMessage());
@@ -158,9 +163,9 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
 
 }
 
-void ConnectionPool::closeConnectionPool() {
+void ConnectionPool::closeConnectionPool(oracle::occi::StatelessConnectionPool::DestroyMode mode) {
   if(m_environment && m_connectionPool) {
-    m_environment->terminateStatelessConnectionPool(m_connectionPool);
+    m_environment->terminateStatelessConnectionPool(m_connectionPool, mode);
     m_connectionPool = NULL;
   }
 }
@@ -313,7 +318,7 @@ Handle<Value> Connection::SetPrefetchRowCount(const Arguments& args) {
 void Connection::closeConnection() {
   if(m_environment && m_connection) {
     if(m_connectionPool) {
-      m_connectionPool->releaseConnection(m_connection, "node-oracle");
+      m_connectionPool->releaseConnection(m_connection, "strong-oracle");
     } else {
       m_environment->terminateConnection(m_connection);
     }
@@ -640,8 +645,9 @@ void Connection::EIO_Execute(uv_work_t* req) {
     baton->error = new string(ex.getMessage());
   } catch (const exception& ex) {
 	baton->error = new string(ex.what());
-  } catch (...) {
-    baton->error = new string("Unknown Error");
+  }
+  catch (...) {
+    baton->error = new string("Unknown exception thrown from OCCI");
   }
 
   if(stmt && rs) {
