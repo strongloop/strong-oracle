@@ -1,8 +1,8 @@
 {
-  "name": "oracle",
+  "name": "strong-oracle",
   "description": "Oracle database driver",
   "keywords": ["database", "db", "oracle"],
-  "homepage": "https://github.com/strongloop/node-oracle",
+  "homepage": "https://github.com/strongloop/strong-oracle",
   "version": "1.0.0",
   "engines": {
     "node": ">=0.10.0"
@@ -14,19 +14,23 @@
     }
   ],
   "bugs": {
-    "url": "https://github.com/strongloop/node-oracle/issues"
+    "url": "https://github.com/strongloop/strong-oracle/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/strongloop/node-oracle.git"
+    "url": "git://github.com/strongloop/strong-oracle.git"
   },
   "dependencies": {
   },
   "devDependencies": {
-    "nodeunit": "~>0.8.0"
+    "nodeunit": "~>0.8.6"
   },
   "scripts": {
     "test": "nodeunit test/integration.js test/outparams.js"
   },
-  "main": "./index.js"
+  "main": "./index.js",
+  "license": {
+    "name": "Dual Artistic-2.0/StrongLoop",
+    "url": "https://github.com/strongloop/strong-oracle/blob/master/LICENSE"
+  }
 }

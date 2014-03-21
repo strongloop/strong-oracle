@@ -105,8 +105,9 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
     baton->error = new std::string(ex.getMessage());
   } catch (const std::exception& ex) {
     baton->error = new std::string(ex.what());
-  } catch (...) {
-    baton->error = new std::string("Unknown exception is thrown");
+  }
+  catch (...) {
+    baton->error = new std::string("Unknown exception thrown from OCCI");
   }
 }
 
