@@ -1,4 +1,3 @@
-
 #ifndef _excute_baton_h_
 #define _excute_baton_h_
 
@@ -8,7 +7,7 @@ class Connection;
 #include <node.h>
 #include <node_buffer.h>
 #ifndef WIN32
-  #include <unistd.h>
+#include <unistd.h>
 #endif
 #include <occi.h>
 #include <string>
@@ -45,7 +44,7 @@ struct value_t {
 struct output_t {
   int type;
   int index;
-  std::string strVal; 
+  std::string strVal;
   int intVal;
   double doubleVal;
   float floatVal;
@@ -58,23 +57,28 @@ struct output_t {
   oracle::occi::Blob blobVal;
 };
 
+/**
+ * Baton for execute function
+ */
 class ExecuteBaton {
 public:
-  ExecuteBaton(Connection* connection, const char* sql, v8::Local<v8::Array>* values, v8::Handle<v8::Function>* callback);
+  ExecuteBaton(Connection* connection, const char* sql,
+      v8::Local<v8::Array>* values, v8::Handle<v8::Function>* callback);
   ~ExecuteBaton();
 
-  Connection *connection;
-  v8::Persistent<v8::Function> callback;
-  std::vector<value_t*> values;
-  std::string sql;
-  std::vector<column_t*> columns;
-  std::vector<row_t*>* rows;
-  std::vector<output_t*>* outputs;
-  std::string* error;
-  int updateCount;
+  Connection *connection; // The JS connection object
+  v8::Persistent<v8::Function> callback; // The JS callback function
+  std::vector<value_t*> values; // The array of parameter values
+  std::string sql; // The sql statement string
+  std::vector<column_t*> columns; // The list of columns
+  std::vector<row_t*>* rows; // The list of rows
+  std::vector<output_t*>* outputs; // The output values
+  std::string* error; // The error message
+  int updateCount; // The update count
 
 private:
-  static void CopyValuesToBaton(ExecuteBaton* baton, v8::Local<v8::Array>* values);
+  static void CopyValuesToBaton(ExecuteBaton* baton,
+      v8::Local<v8::Array>* values);
 };
 
 #endif

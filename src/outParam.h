@@ -1,11 +1,10 @@
-
 #ifndef _outparam_h_
 #define _outparam_h_
 
 #include <v8.h>
 #include <node.h>
 #ifndef WIN32
-  #include <unistd.h>
+#include <unistd.h>
 #endif
 #include "utils.h"
 #include <occi.h>
@@ -15,7 +14,7 @@ using namespace v8;
 
 struct inout_t {
   bool hasInParam;
-  const char* stringVal; 
+  const char* stringVal;
   int intVal;
   double doubleVal;
   float floatVal;
@@ -24,7 +23,10 @@ struct inout_t {
   oracle::occi::Number numberVal;
 };
 
-class OutParam : ObjectWrap {
+/**
+ * Oracle out parameter
+ */
+class OutParam: ObjectWrap {
 public:
   static void Init(Handle<Object> target);
   static Handle<Value> New(const Arguments& args);
@@ -34,9 +36,9 @@ public:
   inout_t _inOut;
   OutParam();
   ~OutParam();
-  
-  int type();  
-  int size();  
+
+  int type();
+  int size();
   static const int OCCIINT = 0;
   static const int OCCISTRING = 1;
   static const int OCCIDOUBLE = 2;

@@ -1,4 +1,3 @@
-
 #ifndef _commit_baton_h_
 #define _commit_baton_h_
 

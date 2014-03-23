@@ -6,6 +6,7 @@
 
 Persistent<FunctionTemplate> OracleClient::s_ct;
 
+// ConnectBaton implementation
 ConnectBaton::ConnectBaton(OracleClient* client, oracle::occi::Environment* environment, v8::Handle<v8::Function>* callback) {
   this->client = client;
   if(callback != NULL) {
@@ -16,11 +17,19 @@ ConnectBaton::ConnectBaton(OracleClient* client, oracle::occi::Environment* envi
   this->environment = environment;
   this->error = NULL;
   this->connection = NULL;
+  this->connectionPool = NULL;
 
   this->hostname = "127.0.0.1";
   this->user = "";
   this->password = "";
   this->database = "";
+
+  this->port = 1521;
+  this->minConn = 0;
+  this->maxConn = 4;
+  this->incrConn = 1;
+  this->timeout =0;
+  this->busyOption = oracle::occi::StatelessConnectionPool::WAIT;
 }
 
 ConnectBaton::~ConnectBaton() {
@@ -28,6 +37,15 @@ ConnectBaton::~ConnectBaton() {
   if(error) {
     delete error;
   }
+}
+
+// OracleClient implementation
+OracleClient::OracleClient() {
+  m_environment = oracle::occi::Environment::createEnvironment(oracle::occi::Environment::THREADED_MUTEXED);
+}
+
+OracleClient::~OracleClient() {
+  oracle::occi::Environment::terminateEnvironment(m_environment);
 }
 
 void OracleClient::Init(Handle<Object> target) {
@@ -54,13 +72,6 @@ Handle<Value> OracleClient::New(const Arguments& args) {
   return scope.Close(args.This());
 }
 
-OracleClient::OracleClient() {
-  m_environment = oracle::occi::Environment::createEnvironment(oracle::occi::Environment::THREADED_MUTEXED);
-}
-
-OracleClient::~OracleClient() {
-  oracle::occi::Environment::terminateEnvironment(m_environment);
-}
 
 Handle<Value> OracleClient::Connect(const Arguments& args) {
   HandleScope scope;
@@ -122,7 +133,7 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+    Handle<Object> connection = Connection::s_ct->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->client->m_environment, NULL, baton->connection);
     argv[1] = connection;
   }
@@ -160,7 +171,7 @@ Handle<Value> OracleClient::ConnectSync(const Arguments& args) {
     return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
   }
 
-  Handle<Object> connection = Connection::constructorTemplate->GetFunction()->NewInstance();
+  Handle<Object> connection = Connection::s_ct->GetFunction()->NewInstance();
       (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.client->m_environment, NULL, baton.connection);
 
   return scope.Close(connection);
@@ -204,7 +215,7 @@ Handle<Value> OracleClient::CreateConnectionPoolSync(const Arguments& args) {
     scp->setTimeOut(timeout);
     scp->setBusyOption(static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption));
 
-    Handle<Object> connectionPool = ConnectionPool::connectionPoolConstructorTemplate->GetFunction()->NewInstance();
+    Handle<Object> connectionPool = ConnectionPool::s_ct->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
 
     return scope.Close(connectionPool);
@@ -294,7 +305,7 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Handle<Object> connectionPool = ConnectionPool::connectionPoolConstructorTemplate->GetFunction()->NewInstance();
+    Handle<Object> connectionPool = ConnectionPool::s_ct->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(baton->client->m_environment, baton->connectionPool);
     argv[1] = connectionPool;
   }
@@ -307,8 +318,6 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
 
   delete baton;
 }
-
-
 
 extern "C" {
   static void init(Handle<Object> target) {

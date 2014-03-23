@@ -1,4 +1,3 @@
-
 #include "outParam.h"
 #include "nodeOracleException.h"
 #include <iostream>
@@ -7,6 +6,8 @@ using namespace std;
 Persistent<FunctionTemplate> OutParam::constructorTemplate;
 
 /**
+ * The C++ class represents a JS constructor as follows:
+ *
  * function OutParam(type, options) {
  *   this._type = type || 0;
  *   this._size = options.size;
@@ -20,27 +21,29 @@ void OutParam::Init(Handle<Object> target) {
   constructorTemplate = Persistent<FunctionTemplate>::New(t);
   constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
   constructorTemplate->SetClassName(String::NewSymbol("OutParam"));
-  target->Set(String::NewSymbol("OutParam"), constructorTemplate->GetFunction());
+  target->Set(String::NewSymbol("OutParam"),
+      constructorTemplate->GetFunction());
 }
 
 Handle<Value> OutParam::New(const Arguments& args) {
   HandleScope scope;
   OutParam *outParam = new OutParam();
 
-  if(args.Length() >=1 ) {
-    outParam->_type = args[0]->IsUndefined() ? OutParam::OCCIINT : args[0]->NumberValue();
+  if (args.Length() >= 1) {
+    outParam->_type =
+        args[0]->IsUndefined() ? OutParam::OCCIINT : args[0]->NumberValue();
   } else {
     outParam->_type = OutParam::OCCIINT;
   }
-  
-  if (args.Length() >=2 && !args[1]->IsUndefined()) {
+
+  if (args.Length() >= 2 && !args[1]->IsUndefined()) {
     REQ_OBJECT_ARG(1, opts);
     OBJ_GET_NUMBER(opts, "size", outParam->_size, 200);
 
     // check if there's an 'in' param
     if (opts->Has(String::New("in"))) {
       outParam->_inOut.hasInParam = true;
-      switch(outParam->_type) {
+      switch (outParam->_type) {
       case OutParam::OCCIINT: {
         OBJ_GET_NUMBER(opts, "in", outParam->_inOut.intVal, 0);
         break;
@@ -62,7 +65,7 @@ Handle<Value> OutParam::New(const Arguments& args) {
         break;
       }
       default:
-        throw NodeOracleException("Unhandled OutPram type!");
+        throw NodeOracleException("Unhandled OutParam type!");
       }
     }
   }
