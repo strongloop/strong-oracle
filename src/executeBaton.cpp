@@ -3,41 +3,47 @@
 #include "nodeOracleException.h"
 #include "connection.h"
 #include <iostream>
+
 using namespace std;
+using namespace v8;
 
 ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql,
-    v8::Local<v8::Array>* values, v8::Handle<v8::Function>* callback) {
+    Local<Array>* values, Handle<Function>* callback) {
   this->connection = connection;
   this->sql = sql;
   if (callback != NULL) {
-    this->callback = Persistent<Function>::New(*callback);
+    NanCallback *cb = new NanCallback(*callback);
+    this->callback = cb;
+  } else {
+    NanCallback *cb = new NanCallback();
+    this->callback = cb;
   }
-  this->outputs = new std::vector<output_t*>();
+  this->outputs = new vector<output_t*>();
   this->error = NULL;
   CopyValuesToBaton(this, values);
 }
 
 ExecuteBaton::~ExecuteBaton() {
-  callback.Dispose();
+  delete callback;
 
-  for (std::vector<column_t*>::iterator iterator = columns.begin(), end =
+  for (vector<column_t*>::iterator iterator = columns.begin(), end =
       columns.end(); iterator != end; ++iterator) {
     column_t* col = *iterator;
     delete col;
   }
 
-  for (std::vector<value_t*>::iterator iterator = values.begin(), end =
+  for (vector<value_t*>::iterator iterator = values.begin(), end =
       values.end(); iterator != end; ++iterator) {
 
     value_t* val = *iterator;
     if (val->type == VALUE_TYPE_STRING) {
-      delete (std::string*) val->value;
+      delete (string*) val->value;
     }
     delete val;
   }
 
   if (rows) {
-    for (std::vector<row_t*>::iterator iterator = rows->begin(), end =
+    for (vector<row_t*>::iterator iterator = rows->begin(), end =
         rows->end(); iterator != end; ++iterator) {
       row_t* currentRow = *iterator;
       delete currentRow;
@@ -47,7 +53,7 @@ ExecuteBaton::~ExecuteBaton() {
   }
 
   if (outputs) {
-    for (std::vector<output_t*>::iterator iterator = outputs->begin(), end =
+    for (vector<output_t*>::iterator iterator = outputs->begin(), end =
         outputs->end(); iterator != end; ++iterator) {
       output_t* o = *iterator;
       delete o;
@@ -59,7 +65,7 @@ ExecuteBaton::~ExecuteBaton() {
     delete error;
 }
 
-double CallDateMethod(v8::Local<v8::Date> date, const char* methodName) {
+double CallDateMethod(Local<Date> date, const char* methodName) {
   Handle<Value> args[1]; // should be zero but on windows the compiler will not allow a zero length array
   Local<Value> result = Local<Function>::Cast(
       date->Get(String::New(methodName)))->Call(date, 0, args);
@@ -67,7 +73,7 @@ double CallDateMethod(v8::Local<v8::Date> date, const char* methodName) {
 }
 
 oracle::occi::Date* V8DateToOcciDate(oracle::occi::Environment* env,
-    v8::Local<v8::Date> val) {
+    Local<Date> val) {
   int year = CallDateMethod(val, "getFullYear");
   int month = CallDateMethod(val, "getMonth") + 1;
   int day = CallDateMethod(val, "getDate");
@@ -80,10 +86,10 @@ oracle::occi::Date* V8DateToOcciDate(oracle::occi::Environment* env,
 }
 
 void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
-    v8::Local<v8::Array>* values) {
-  //XXX cache Length()
+    Local<Array>* values) {
+
   for (uint32_t i = 0; i < (*values)->Length(); i++) {
-    v8::Local<v8::Value> val = (*values)->Get(i);
+    Local<Value> val = (*values)->Get(i);
     value_t *value = new value_t();
 
     // null
@@ -95,9 +101,9 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
 
     // string
     else if (val->IsString()) {
-      v8::String::Utf8Value utf8Value(val);
+      String::Utf8Value utf8Value(val);
       value->type = VALUE_TYPE_STRING;
-      value->value = new std::string(*utf8Value);
+      value->value = new string(*utf8Value);
       baton->values.push_back(value);
     }
 
@@ -105,14 +111,14 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     else if (val->IsDate()) {
       value->type = VALUE_TYPE_DATE;
       value->value = V8DateToOcciDate(baton->connection->getEnvironment(),
-          v8::Date::Cast(*val));
+          DateCast(val));
       baton->values.push_back(value);
     }
 
     // number
     else if (val->IsNumber()) {
       value->type = VALUE_TYPE_NUMBER;
-      double d = v8::Number::Cast(*val)->Value();
+      double d = Number::Cast(*val)->Value();
       value->value = new oracle::occi::Number(d); // XXX not deleted in dtor
       baton->values.push_back(value);
     }
@@ -122,28 +128,34 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
       value->type = VALUE_TYPE_CLOB;
       Local<Object> buffer = val->ToObject();
       size_t length = node::Buffer::Length(buffer);
-      const char *data = node::Buffer::Data(buffer);
-      value->value = node::Buffer::New(data, length);
+      uint8_t* data = (uint8_t*) node::Buffer::Data(buffer);
+
+      buffer_t* buf = new buffer_t();
+      buf->length = length;
+      buf->data = data;
+
+      value->value = buf;
       baton->values.push_back(value);
     }
 
+
     // output
-    else if (val->IsObject()
-        && val->ToObject()->FindInstanceInPrototypeChain(
-            OutParam::constructorTemplate) != v8::Null()) {
+    else if (NanHasInstance(OutParam::constructorTemplate, val)) {
+
       OutParam* op = node::ObjectWrap::Unwrap<OutParam>(val->ToObject());
+      op->Ref();
 
       // [rfeng] The OutParam object will be destroyed. We need to create a new copy.
-      OutParam* p = new OutParam(*op);
       value->type = VALUE_TYPE_OUTPUT;
-      value->value = p;
+      value->value = op;
       baton->values.push_back(value);
 
       output_t* output = new output_t();
       output->rows = NULL;
-      output->type = p->type();
+      output->type = op->type();
       output->index = i + 1;
       baton->outputs->push_back(output);
+
     }
 
     // unhandled type

@@ -26,10 +26,10 @@ struct inout_t {
 /**
  * Oracle out parameter
  */
-class OutParam: ObjectWrap {
+class OutParam: public ObjectWrap {
 public:
   static void Init(Handle<Object> target);
-  static Handle<Value> New(const Arguments& args);
+  static NAN_METHOD(New);
   static Persistent<FunctionTemplate> constructorTemplate;
   int _type;
   int _size;
@@ -39,6 +39,11 @@ public:
 
   int type();
   int size();
+
+  // Make Ref and Unref public so that ExecuteBaton can call them
+  void Ref();
+  void Unref();
+
   static const int OCCIINT = 0;
   static const int OCCISTRING = 1;
   static const int OCCIDOUBLE = 2;
@@ -50,7 +55,6 @@ public:
   static const int OCCINUMBER = 8;
   static const int OCCIBLOB = 9;
 
-private:
 };
 
 #endif

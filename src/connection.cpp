@@ -10,11 +10,11 @@
 #include <iostream>
 using namespace std;
 
-// Persistent<FunctionTemplate> ConnectionPool::s_ct;
+Persistent<FunctionTemplate> ConnectionPool::s_ct;
 
 // ConnectionPool implementation
 ConnectionPool::ConnectionPool() :
-    m_connectionPool(NULL), m_environment(NULL) {
+    m_environment(NULL), m_connectionPool(NULL) {
 }
 
 ConnectionPool::~ConnectionPool() {
@@ -22,28 +22,28 @@ ConnectionPool::~ConnectionPool() {
 }
 
 void ConnectionPool::Init(Handle<Object> target) {
-  HandleScope scope;
+  NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(ConnectionPool::New);
-  ConnectionPool::s_ct = Persistent<FunctionTemplate>::New(t);
-  ConnectionPool::s_ct->InstanceTemplate()->SetInternalFieldCount(1);
-  ConnectionPool::s_ct->SetClassName(String::NewSymbol("ConnectionPool"));
+  NanAssignPersistent(FunctionTemplate, ConnectionPool::s_ct, t);
 
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::s_ct, "getConnectionSync", ConnectionPool::GetConnectionSync);
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::s_ct, "getConnection", ConnectionPool::GetConnection);
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::s_ct, "close", ConnectionPool::Close);
-  NODE_SET_PROTOTYPE_METHOD(ConnectionPool::s_ct, "getInfo", ConnectionPool::GetInfo);
+  t->InstanceTemplate()->SetInternalFieldCount(1);
+  t->SetClassName(NanSymbol("ConnectionPool"));
 
-  target->Set(String::NewSymbol("ConnectionPool"),
-      ConnectionPool::s_ct->GetFunction());
+  NODE_SET_PROTOTYPE_METHOD(t, "getConnectionSync", ConnectionPool::GetConnectionSync);
+  NODE_SET_PROTOTYPE_METHOD(t, "getConnection", ConnectionPool::GetConnection);
+  NODE_SET_PROTOTYPE_METHOD(t, "close", ConnectionPool::Close);
+  NODE_SET_PROTOTYPE_METHOD(t, "getInfo", ConnectionPool::GetInfo);
+
+  target->Set(NanSymbol("ConnectionPool"), t->GetFunction());
 }
 
-Handle<Value> ConnectionPool::New(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(ConnectionPool::New) {
+  NanScope();
 
   ConnectionPool *connectionPool = new ConnectionPool();
   connectionPool->Wrap(args.This());
-  return scope.Close(args.This());
+  NanReturnValue(args.This());
 }
 
 void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment,
@@ -52,8 +52,8 @@ void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment,
   m_connectionPool = connectionPool;
 }
 
-Handle<Value> ConnectionPool::Close(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(ConnectionPool::Close) {
+  NanScope();
   try {
     ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
         args.This());
@@ -68,63 +68,64 @@ Handle<Value> ConnectionPool::Close(const Arguments& args) {
 
     connectionPool->closeConnectionPool(mode);
 
-    return scope.Close(Undefined());
+    NanReturnUndefined();
   } catch (const exception& ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+    return NanThrowError(ex.what());
   }
 }
 
-Handle<Value> ConnectionPool::GetInfo(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(ConnectionPool::GetInfo) {
+  NanScope();
   ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
       args.This());
   if (connectionPool->m_connectionPool) {
     Local<Object> obj = Object::New();
 
-    obj->Set(String::NewSymbol("openConnections"),
+    obj->Set(NanSymbol("openConnections"),
         Uint32::New(connectionPool->m_connectionPool->getOpenConnections()));
-    obj->Set(String::NewSymbol("busyConnections"),
+    obj->Set(NanSymbol("busyConnections"),
         Uint32::New(connectionPool->m_connectionPool->getBusyConnections()));
-    obj->Set(String::NewSymbol("maxConnections"),
+    obj->Set(NanSymbol("maxConnections"),
         Uint32::New(connectionPool->m_connectionPool->getMaxConnections()));
-    obj->Set(String::NewSymbol("minConnections"),
+    obj->Set(NanSymbol("minConnections"),
         Uint32::New(connectionPool->m_connectionPool->getMinConnections()));
-    obj->Set(String::NewSymbol("incrConnections"),
+    obj->Set(NanSymbol("incrConnections"),
         Uint32::New(connectionPool->m_connectionPool->getIncrConnections()));
-    obj->Set(String::NewSymbol("busyOption"),
+    obj->Set(NanSymbol("busyOption"),
         Uint32::New(connectionPool->m_connectionPool->getBusyOption()));
-    obj->Set(String::NewSymbol("timeout"),
+    obj->Set(NanSymbol("timeout"),
         Uint32::New(connectionPool->m_connectionPool->getTimeOut()));
 
-    obj->Set(String::NewSymbol("poolName"),
+    obj->Set(NanSymbol("poolName"),
         String::New(connectionPool->m_connectionPool->getPoolName().c_str()));
 
-    return scope.Close(obj);
+    NanReturnValue(obj);
   } else {
-    return scope.Close(Undefined());
+    NanReturnUndefined();
   }
 }
 
-Handle<Value> ConnectionPool::GetConnectionSync(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(ConnectionPool::GetConnectionSync) {
+  NanScope();
   try {
     ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
         args.This());
     // std::string tag = "strong-oracle";
     oracle::occi::Connection *conn =
         connectionPool->getConnectionPool()->getConnection("strong-oracle");
-    Handle<Object> connection = Connection::s_ct->GetFunction()->NewInstance();
+    Local<FunctionTemplate> ft = NanPersistentToLocal(Connection::s_ct);
+    Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
         connectionPool->getEnvironment(), connectionPool->getConnectionPool(),
         conn);
-    return scope.Close(connection);
+    NanReturnValue(connection);
   } catch (const exception& ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+    return NanThrowError(ex.what());
   }
 }
 
-Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(ConnectionPool::GetConnection) {
+  NanScope();
   ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
       args.This());
 
@@ -133,10 +134,9 @@ Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
   ConnectionPoolBaton* baton;
   try {
     baton = new ConnectionPoolBaton(connectionPool->getEnvironment(),
-        connectionPool, &callback);
+        connectionPool, callback);
   } catch (NodeOracleException &ex) {
-    return scope.Close(
-        ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+    return NanThrowError(ex.getMessage().c_str());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -146,7 +146,7 @@ Handle<Value> ConnectionPool::GetConnection(const Arguments& args) {
 
   connectionPool->Ref();
 
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
 void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
@@ -163,18 +163,19 @@ void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
 }
 
 void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
-  HandleScope scope;
+  NanScope();
   ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
 
   baton->connectionPool->Unref();
 
   Handle<Value> argv[2];
   if (baton->error) {
-    argv[0] = Exception::Error(String::New(baton->error->c_str()));
+    argv[0] = NanError(baton->error->c_str());
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Handle<Object> connection = Connection::s_ct->GetFunction()->NewInstance();
+    Local<FunctionTemplate> ft = NanPersistentToLocal(Connection::s_ct);
+    Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
         baton->environment, baton->connectionPool->getConnectionPool(),
         baton->connection);
@@ -182,7 +183,7 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
   }
 
   v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+  baton->callback->Call(2, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
@@ -199,38 +200,39 @@ void ConnectionPool::closeConnectionPool(
   }
 }
 
-// Persistent<FunctionTemplate> Connection::s_ct;
+Persistent<FunctionTemplate> Connection::s_ct;
 
 void Connection::Init(Handle<Object> target) {
-  HandleScope scope;
+  NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(Connection::New);
-  Connection::s_ct = Persistent<FunctionTemplate>::New(t);
-  Connection::s_ct->InstanceTemplate()->SetInternalFieldCount(1);
-  Connection::s_ct->SetClassName(String::NewSymbol("Connection"));
+  NanAssignPersistent(FunctionTemplate, Connection::s_ct, t);
 
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "execute", Execute);
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "executeSync", ExecuteSync);
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "close", Connection::Close);
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "isConnected", IsConnected);
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "setAutoCommit", SetAutoCommit);
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "setPrefetchRowCount", SetPrefetchRowCount);
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "commit", Commit);
-  NODE_SET_PROTOTYPE_METHOD(Connection::s_ct, "rollback", Rollback);
+  t->InstanceTemplate()->SetInternalFieldCount(1);
+  t->SetClassName(NanSymbol("Connection"));
 
-  target->Set(String::NewSymbol("Connection"), Connection::s_ct->GetFunction());
+  NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
+  NODE_SET_PROTOTYPE_METHOD(t, "executeSync", ExecuteSync);
+  NODE_SET_PROTOTYPE_METHOD(t, "close", Connection::Close);
+  NODE_SET_PROTOTYPE_METHOD(t, "isConnected", IsConnected);
+  NODE_SET_PROTOTYPE_METHOD(t, "setAutoCommit", SetAutoCommit);
+  NODE_SET_PROTOTYPE_METHOD(t, "setPrefetchRowCount", SetPrefetchRowCount);
+  NODE_SET_PROTOTYPE_METHOD(t, "commit", Commit);
+  NODE_SET_PROTOTYPE_METHOD(t, "rollback", Rollback);
+
+  target->Set(NanSymbol("Connection"), t->GetFunction());
 }
 
-Handle<Value> Connection::New(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::New) {
+  NanScope();
 
   Connection *connection = new Connection();
   connection->Wrap(args.This());
-  return scope.Close(args.This());
+  NanReturnValue(args.This());
 }
 
 Connection::Connection() :
-    m_connectionPool(NULL), m_connection(NULL), m_environment(NULL), m_autoCommit(
+    m_environment(NULL), m_connectionPool(NULL), m_connection(NULL), m_autoCommit(
         true), m_prefetchRowCount(0) {
 }
 
@@ -238,8 +240,8 @@ Connection::~Connection() {
   closeConnection();
 }
 
-Handle<Value> Connection::Execute(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::Execute) {
+  NanScope();
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_STRING_ARG(0, sql);
@@ -251,8 +253,7 @@ Handle<Value> Connection::Execute(const Arguments& args) {
   ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values,
       &callback);
   if (baton->error != NULL) {
-    return scope.Close(
-        ThrowException(Exception::Error(String::New(baton->error->c_str()))));
+    return NanThrowError(baton->error->c_str());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -262,44 +263,43 @@ Handle<Value> Connection::Execute(const Arguments& args) {
 
   connection->Ref();
 
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
-Handle<Value> Connection::Close(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::Close) {
+  NanScope();
   try {
     Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
     connection->closeConnection();
 
-    return scope.Close(Undefined());
+    NanReturnUndefined();
   } catch (const exception& ex) {
-    return scope.Close(ThrowException(Exception::Error(String::New(ex.what()))));
+    return NanThrowError(ex.what());
   }
 }
 
-Handle<Value> Connection::IsConnected(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::IsConnected) {
+  NanScope();
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   if (connection && connection->m_connection) {
-    return scope.Close(Boolean::New(true));
+    NanReturnValue(Boolean::New(true));
   } else {
-    return scope.Close(Boolean::New(false));
+    NanReturnValue(Boolean::New(false));
   }
 }
 
-Handle<Value> Connection::Commit(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::Commit) {
+  NanScope();
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_FUN_ARG(0, callback);
 
   CommitBaton* baton;
   try {
-    baton = new CommitBaton(connection, &callback);
+    baton = new CommitBaton(connection, callback);
   } catch (NodeOracleException &ex) {
-    return scope.Close(
-        ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+    return NanThrowError(ex.getMessage().c_str());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -309,21 +309,20 @@ Handle<Value> Connection::Commit(const Arguments& args) {
 
   connection->Ref();
 
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
-Handle<Value> Connection::Rollback(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::Rollback) {
+  NanScope();
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_FUN_ARG(0, callback);
 
   RollbackBaton* baton;
   try {
-    baton = new RollbackBaton(connection, &callback);
+    baton = new RollbackBaton(connection, callback);
   } catch (NodeOracleException &ex) {
-    return scope.Close(
-        ThrowException(Exception::Error(String::New(ex.getMessage().c_str()))));
+    return NanThrowError(ex.getMessage().c_str());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -333,23 +332,23 @@ Handle<Value> Connection::Rollback(const Arguments& args) {
 
   connection->Ref();
 
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
-Handle<Value> Connection::SetAutoCommit(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::SetAutoCommit) {
+  NanScope();
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
   REQ_BOOL_ARG(0, autoCommit);
   connection->m_autoCommit = autoCommit;
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
-Handle<Value> Connection::SetPrefetchRowCount(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::SetPrefetchRowCount) {
+  NanScope();
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
   REQ_INT_ARG(0, prefetchRowCount);
   connection->m_prefetchRowCount = prefetchRowCount;
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
 void Connection::closeConnection() {
@@ -453,6 +452,7 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt,
         std::string strMsg = std::string(msg);
         throw NodeOracleException(strMsg);
       }
+      outParam->Unref();
       outputParam = index;
       break;
     default:
@@ -566,7 +566,7 @@ void Connection::EIO_Commit(uv_work_t* req) {
 }
 
 void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
-  HandleScope scope;
+  NanScope();
   CommitBaton* baton = static_cast<CommitBaton*>(req->data);
 
   baton->connection->Unref();
@@ -574,7 +574,7 @@ void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
   Handle<Value> argv[2];
   argv[0] = Undefined();
   v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 1, argv);
+  baton->callback->Call(1, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
@@ -590,7 +590,7 @@ void Connection::EIO_Rollback(uv_work_t* req) {
 }
 
 void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
-  HandleScope scope;
+  NanScope();
   RollbackBaton* baton = static_cast<RollbackBaton*>(req->data);
 
   baton->connection->Unref();
@@ -598,7 +598,7 @@ void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
   Handle<Value> argv[2];
   argv[0] = Undefined();
   v8::TryCatch tryCatch;
-  baton->callback->Call(Context::GetCurrent()->Global(), 1, argv);
+  baton->callback->Call(1, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
@@ -724,7 +724,7 @@ Local<Date> OracleDateToV8Date(oracle::occi::Date* d) {
   int year;
   unsigned int month, day, hour, min, sec;
   d->getDate(year, month, day, hour, min, sec);
-  Local<Date> date = Date::Cast(*Date::New(0.0));
+  Local<Date> date = DateCast(Date::New(0.0));
   CallDateMethod(date, "setUTCMilliseconds", 0);
   CallDateMethod(date, "setUTCSeconds", sec);
   CallDateMethod(date, "setUTCMinutes", min);
@@ -740,7 +740,7 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
   unsigned int month, day, hour, min, sec, fs, ms;
   d->getDate(year, month, day);
   d->getTime(hour, min, sec, fs);
-  Local<Date> date = Date::Cast(*Date::New(0.0));
+  Local<Date> date = DateCast(Date::New(0.0));
   //occi always returns nanoseconds, regardless of precision set on timestamp column
   ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
 
@@ -843,16 +843,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
         v->close();
 
         // convert to V8 buffer
-        node::Buffer *nodeBuff = node::Buffer::New(buffer, blobLength,
-            RandomBytesFree, NULL);
-        v8::Local<v8::Object> globalObj = v8::Context::GetCurrent()->Global();
-        v8::Local<v8::Function> bufferConstructor =
-            v8::Local<v8::Function>::Cast(
-                globalObj->Get(v8::String::New("Buffer")));
-        v8::Handle<v8::Value> constructorArgs[3] = { nodeBuff->handle_,
-            v8::Integer::New(blobLength), v8::Integer::New(0) };
-        v8::Local<v8::Object> v8Buffer = bufferConstructor->NewInstance(3,
-            constructorArgs);
+        v8::Local<v8::Object> v8Buffer = NanBufferUse(buffer, blobLength);
         obj->Set(String::New(col->name.c_str()), v8Buffer);
         delete v;
         delete[] buffer;
@@ -888,24 +879,24 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns,
 
 void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
 
-  HandleScope scope;
+  NanScope();
   ExecuteBaton* baton = static_cast<ExecuteBaton*>(req->data);
 
   baton->connection->Unref();
   try {
     Handle<Value> argv[2];
     handleResult(baton, argv);
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    baton->callback->Call(2, argv);
   } catch (NodeOracleException &ex) {
     Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
+    argv[0] = NanError(ex.getMessage().c_str());
     argv[1] = Undefined();
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    baton->callback->Call(2, argv);
   } catch (const exception &ex) {
     Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.what()));
+    argv[0] = NanError(ex.what());
     argv[1] = Undefined();
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    baton->callback->Call(2, argv);
   }
 
   delete baton;
@@ -914,7 +905,7 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
 void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
   try {
     if (baton->error) {
-      argv[0] = Exception::Error(String::New(baton->error->c_str()));
+      argv[0] = NanError(baton->error->c_str());
       argv[1] = Undefined();
     } else {
       argv[0] = Undefined();
@@ -939,25 +930,22 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             snprintf(msg, sizeof(msg), "returnParam");
           }
           std::string returnParam(msg);
+          Local<String> prop = String::New(returnParam.c_str());
           switch (output->type) {
           case OutParam::OCCIINT:
-            obj->Set(String::New(returnParam.c_str()),
-                Integer::New(output->intVal));
+            obj->Set(prop, Integer::New(output->intVal));
             break;
           case OutParam::OCCISTRING:
-            obj->Set(String::New(returnParam.c_str()),
-                String::New(output->strVal.c_str()));
+            obj->Set(prop, String::New(output->strVal.c_str()));
             break;
           case OutParam::OCCIDOUBLE:
-            obj->Set(String::New(returnParam.c_str()),
-                Number::New(output->doubleVal));
+            obj->Set(prop, Number::New(output->doubleVal));
             break;
           case OutParam::OCCIFLOAT:
-            obj->Set(String::New(returnParam.c_str()),
-                Number::New(output->floatVal));
+            obj->Set(prop, Number::New(output->floatVal));
             break;
           case OutParam::OCCICURSOR:
-            obj->Set(String::New(returnParam.c_str()),
+            obj->Set(prop,
                 CreateV8ArrayFromRows(output->columns, output->rows));
             break;
           case OutParam::OCCICLOB: {
@@ -969,8 +957,7 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             instream->readBuffer(buffer, lobLength);
             output->clobVal.closeStream(instream);
             output->clobVal.close();
-            obj->Set(String::New(returnParam.c_str()),
-                String::New(buffer, lobLength));
+            obj->Set(prop, String::New(buffer, lobLength));
             delete[] buffer;
             break;
           }
@@ -985,32 +972,19 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             output->blobVal.close();
 
             // convert to V8 buffer
-            node::Buffer *nodeBuff = node::Buffer::New(buffer, lobLength,
-                RandomBytesFree, NULL);
-            v8::Local<v8::Object> globalObj =
-                v8::Context::GetCurrent()->Global();
-            v8::Local<v8::Function> bufferConstructor =
-                v8::Local<v8::Function>::Cast(
-                    globalObj->Get(v8::String::New("Buffer")));
-            v8::Handle<v8::Value> constructorArgs[3] = { nodeBuff->handle_,
-                v8::Integer::New(lobLength), v8::Integer::New(0) };
-            v8::Local<v8::Object> v8Buffer = bufferConstructor->NewInstance(3,
-                constructorArgs);
-            obj->Set(String::New(returnParam.c_str()), v8Buffer);
+            v8::Local<v8::Object> v8Buffer = NanBufferUse(buffer, lobLength);
+            obj->Set(prop, v8Buffer);
             delete[] buffer;
             break;
           }
           case OutParam::OCCIDATE:
-            obj->Set(String::New(returnParam.c_str()),
-                OracleDateToV8Date(&output->dateVal));
+            obj->Set(prop, OracleDateToV8Date(&output->dateVal));
             break;
           case OutParam::OCCITIMESTAMP:
-            obj->Set(String::New(returnParam.c_str()),
-                OracleTimestampToV8Date(&output->timestampVal));
+            obj->Set(prop, OracleTimestampToV8Date(&output->timestampVal));
             break;
           case OutParam::OCCINUMBER:
-            obj->Set(String::New(returnParam.c_str()),
-                Number::New((double) output->numberVal));
+            obj->Set(prop, Number::New((double) output->numberVal));
             break;
           default:
             char msg[128];
@@ -1026,14 +1000,14 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
     }
   } catch (NodeOracleException &ex) {
     Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.getMessage().c_str()));
+    argv[0] = NanError(ex.getMessage().c_str());
     argv[1] = Undefined();
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    baton->callback->Call(2, argv);
   } catch (const std::exception &ex) {
     Handle<Value> argv[2];
-    argv[0] = Exception::Error(String::New(ex.what()));
+    argv[0] = NanError(ex.what());
     argv[1] = Undefined();
-    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    baton->callback->Call(2, argv);
   }
 
 }
@@ -1046,8 +1020,8 @@ void Connection::setConnection(oracle::occi::Environment* environment,
   m_connectionPool = connectionPool;
 }
 
-Handle<Value> Connection::ExecuteSync(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(Connection::ExecuteSync) {
+  NanScope();
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   REQ_STRING_ARG(0, sql);
@@ -1059,8 +1033,7 @@ Handle<Value> Connection::ExecuteSync(const Arguments& args) {
   try {
     baton = new ExecuteBaton(connection, *sqlVal, &values, NULL);
   } catch (NodeOracleException &ex) {
-    return ThrowException(
-        Exception::Error(String::New(ex.getMessage().c_str())));
+    return NanThrowError(ex.getMessage().c_str());
   }
 
   uv_work_t* req = new uv_work_t();
@@ -1074,9 +1047,9 @@ Handle<Value> Connection::ExecuteSync(const Arguments& args) {
 
   if (baton->error) {
     delete baton;
-    return scope.Close(ThrowException(argv[0]));
+    return NanThrowError(argv[0]);
   }
 
   delete baton;
-  return scope.Close(argv[1]);
+  NanReturnValue(argv[1]);
 }

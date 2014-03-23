@@ -8,13 +8,13 @@
  */
 class RollbackBaton {
 public:
-  RollbackBaton(Connection* connection, v8::Handle<v8::Function>* callback) {
+  RollbackBaton(Connection* connection, const v8::Handle<v8::Function>& callback) {
     this->connection = connection;
-    this->callback = Persistent<Function>::New(*callback);
+    this->callback = new NanCallback(callback);
   }
 
   ~RollbackBaton() {
-    callback.Dispose();
+    delete callback;
   }
 
   /**
@@ -24,7 +24,7 @@ public:
   /**
    * The callback function
    */
-  v8::Persistent<v8::Function> callback;
+  NanCallback *callback;
 };
 
 #endif

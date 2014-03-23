@@ -51,7 +51,7 @@
          "link_settings": {"libraries": [ '<(oci_lib_dir)\oraocci12.lib'] }
         }]
       ],
-      "include_dirs": [ "<(oci_include_dir)" ],
+      "include_dirs": [ "<(oci_include_dir)", "<!(node -e \"require('nan')\")" ],
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions" ]
     }

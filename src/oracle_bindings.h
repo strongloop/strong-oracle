@@ -35,7 +35,7 @@ using namespace v8;
  * ...
  * }
  */
-class OracleClient: ObjectWrap {
+class OracleClient: public ObjectWrap {
 public:
   /**
    * Define OracleClient class
@@ -44,31 +44,31 @@ public:
   /**
    * Constructor
    */
-  static Handle<Value> New(const Arguments& args);
+  static NAN_METHOD(New);
 
   /**
    * connect(..., callback)
    */
-  static Handle<Value> Connect(const Arguments& args);
+  static NAN_METHOD(Connect);
   static void EIO_Connect(uv_work_t* req);
   static void EIO_AfterConnect(uv_work_t* req, int status);
 
   /**
    * connectSync(...)
    */
-  static Handle<Value> ConnectSync(const Arguments& args);
+  static NAN_METHOD(ConnectSync);
 
   /**
    * createConnectionPool(..., callback)
    */
-  static Handle<Value> CreateConnectionPool(const Arguments& args);
+  static NAN_METHOD(CreateConnectionPool);
   static void EIO_CreateConnectionPool(uv_work_t* req);
   static void EIO_AfterCreateConnectionPool(uv_work_t* req, int status);
 
   /**
    * createConnectionPoolSync(...)
    */
-  static Handle<Value> CreateConnectionPoolSync(const Arguments& args);
+  static NAN_METHOD(CreateConnectionPoolSync);
 
   OracleClient();
   ~OracleClient();
@@ -96,7 +96,7 @@ public:
   /**
    * The callback function
    */
-  Persistent<Function> callback;
+  NanCallback *callback;
 
   /**
    * host name or ip address for the DB server

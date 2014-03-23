@@ -18,35 +18,35 @@ using namespace v8;
 /**
  * Wrapper for an OCCI Connection class so that it can be used in JavaScript
  */
-class Connection: ObjectWrap {
+class Connection: public ObjectWrap {
 public:
   static Persistent<FunctionTemplate> s_ct;
   static void Init(Handle<Object> target);
-  static Handle<Value> New(const Arguments& args);
+  static NAN_METHOD(New);
 
   // asynchronous execute method
-  static Handle<Value> Execute(const Arguments& args);
+  static NAN_METHOD(Execute);
   static void EIO_Execute(uv_work_t* req);
   static void EIO_AfterExecute(uv_work_t* req, int status);
 
   // synchronous execute method
-  static Handle<Value> ExecuteSync(const Arguments& args);
+  static NAN_METHOD(ExecuteSync);
 
   // asynchronous commit method
-  static Handle<Value> Commit(const Arguments& args);
+  static NAN_METHOD(Commit);
   static void EIO_Commit(uv_work_t* req);
   static void EIO_AfterCommit(uv_work_t* req, int status);
 
   // asynchronous rollback method
-  static Handle<Value> Rollback(const Arguments& args);
+  static NAN_METHOD(Rollback);
   static void EIO_Rollback(uv_work_t* req);
   static void EIO_AfterRollback(uv_work_t* req, int status);
 
-  static Handle<Value> SetAutoCommit(const Arguments& args);
-  static Handle<Value> SetPrefetchRowCount(const Arguments& args);
-  static Handle<Value> IsConnected(const Arguments& args);
+  static NAN_METHOD(SetAutoCommit);
+  static NAN_METHOD(SetPrefetchRowCount);
+  static NAN_METHOD(IsConnected);
 
-  static Handle<Value> Close(const Arguments& args);
+  static NAN_METHOD(Close);
 
   void closeConnection();
 
@@ -93,20 +93,20 @@ private:
 /**
  * Wrapper for an OCCI StatelessConnectionPool class so that it can be used in JavaScript
  */
-class ConnectionPool: ObjectWrap {
+class ConnectionPool: public ObjectWrap {
 public:
   static Persistent<FunctionTemplate> s_ct;
 
   static void Init(Handle<Object> target);
-  static Handle<Value> New(const Arguments& args);
-  static Handle<Value> GetInfo(const Arguments& args);
-  static Handle<Value> Close(const Arguments& args);
+  static NAN_METHOD(New);
+  static NAN_METHOD(GetInfo);
+  static NAN_METHOD(Close);
 
-  static Handle<Value> GetConnection(const Arguments& args);
+  static NAN_METHOD(GetConnection);
   static void EIO_GetConnection(uv_work_t* req);
   static void EIO_AfterGetConnection(uv_work_t* req, int status);
 
-  static Handle<Value> GetConnectionSync(const Arguments& args);
+  static NAN_METHOD(GetConnectionSync);
 
   void closeConnectionPool(
       oracle::occi::StatelessConnectionPool::DestroyMode mode =
@@ -135,22 +135,22 @@ private:
 class ConnectionPoolBaton {
 public:
   ConnectionPoolBaton(oracle::occi::Environment* environment,
-      ConnectionPool* connectionPool, v8::Handle<v8::Function>* callback) {
+      ConnectionPool* connectionPool, const v8::Handle<v8::Function>& callback) {
     this->environment = environment;
     this->connectionPool = connectionPool;
-    this->callback = Persistent<Function>::New(*callback);
+    this->callback = new NanCallback(callback);
     this->connection = NULL;
     this->error = NULL;
   }
 
   ~ConnectionPoolBaton() {
-    callback.Dispose();
+    delete callback;
   }
 
   oracle::occi::Environment* environment;
   ConnectionPool *connectionPool;
   oracle::occi::Connection* connection;
-  v8::Persistent<v8::Function> callback;
+  NanCallback *callback;
 
   std::string* error;
 

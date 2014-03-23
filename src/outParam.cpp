@@ -15,18 +15,18 @@ Persistent<FunctionTemplate> OutParam::constructorTemplate;
  * }
  */
 void OutParam::Init(Handle<Object> target) {
-  HandleScope scope;
+  NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  constructorTemplate = Persistent<FunctionTemplate>::New(t);
-  constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-  constructorTemplate->SetClassName(String::NewSymbol("OutParam"));
-  target->Set(String::NewSymbol("OutParam"),
-      constructorTemplate->GetFunction());
+  NanAssignPersistent(FunctionTemplate, constructorTemplate, t);
+  t->InstanceTemplate()->SetInternalFieldCount(1);
+  t->SetClassName(String::NewSymbol("OutParam"));
+  target->Set(NanSymbol("OutParam"),
+      t->GetFunction());
 }
 
-Handle<Value> OutParam::New(const Arguments& args) {
-  HandleScope scope;
+NAN_METHOD(OutParam::New) {
+  NanScope();
   OutParam *outParam = new OutParam();
 
   if (args.Length() >= 1) {
@@ -70,7 +70,7 @@ Handle<Value> OutParam::New(const Arguments& args) {
     }
   }
   outParam->Wrap(args.This());
-  return args.This();
+  NanReturnValue(args.This());
 }
 
 OutParam::OutParam() {
