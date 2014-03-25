@@ -23,13 +23,19 @@ struct inout_t {
   oracle::occi::Number numberVal;
 };
 
+struct outparam_t {
+  int type;
+  int size;
+  inout_t inOut;
+};
+
 /**
  * Oracle out parameter
  */
-class OutParam: ObjectWrap {
+class OutParam: public ObjectWrap {
 public:
   static void Init(Handle<Object> target);
-  static Handle<Value> New(const Arguments& args);
+  static NAN_METHOD(New);
   static Persistent<FunctionTemplate> constructorTemplate;
   int _type;
   int _size;
@@ -39,6 +45,25 @@ public:
 
   int type();
   int size();
+
+  /**
+   * Create a copy of the outparam to C style struct
+   */
+  outparam_t* c_outparam() {
+    outparam_t* p = new outparam_t();
+    p->type = _type;
+    p->size = _size;
+    p->inOut.hasInParam = _inOut.hasInParam;
+    p->inOut.stringVal = _inOut.stringVal;
+    p->inOut.intVal = _inOut.intVal;
+    p->inOut.doubleVal = _inOut.doubleVal;
+    p->inOut.floatVal = _inOut.floatVal;
+    p->inOut.dateVal = _inOut.dateVal;
+    p->inOut.timestampVal = _inOut.timestampVal;
+    p->inOut.numberVal = _inOut.numberVal;
+    return p;
+  }
+
   static const int OCCIINT = 0;
   static const int OCCISTRING = 1;
   static const int OCCIDOUBLE = 2;
@@ -50,7 +75,6 @@ public:
   static const int OCCINUMBER = 8;
   static const int OCCIBLOB = 9;
 
-private:
 };
 
 #endif

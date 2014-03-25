@@ -15,6 +15,8 @@ class Connection;
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "utils.h"
+
 enum {
   VALUE_TYPE_NULL = 1,
   VALUE_TYPE_OUTPUT = 2,
@@ -39,6 +41,11 @@ struct row_t {
 struct value_t {
   int type;
   void* value;
+};
+
+struct buffer_t {
+  size_t length;
+  uint8_t* data;
 };
 
 struct output_t {
@@ -67,7 +74,7 @@ public:
   ~ExecuteBaton();
 
   Connection *connection; // The JS connection object
-  v8::Persistent<v8::Function> callback; // The JS callback function
+  NanCallback *callback; // The JS callback function
   std::vector<value_t*> values; // The array of parameter values
   std::string sql; // The sql statement string
   std::vector<column_t*> columns; // The list of columns
@@ -76,7 +83,11 @@ public:
   std::string* error; // The error message
   int updateCount; // The update count
 
-private:
+  void ResetValues();
+  void ResetRows();
+  void ResetOutputs();
+  void ResetError();
+
   static void CopyValuesToBaton(ExecuteBaton* baton,
       v8::Local<v8::Array>* values);
 };

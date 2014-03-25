@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <v8.h>
+#include "nan.h"
+
+using namespace v8;
+
 #ifdef _WIN32
 // emulate snprintf() on windows, _snprintf() doesn't zero-terminate the buffer
 // on overflow...
@@ -26,7 +31,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define REQ_BOOL_ARG(I, VAR)                                                                         \
   if (args.Length() <= (I) || !args[I]->IsBoolean())                                                 \
-    return ThrowException(Exception::TypeError(String::New("Argument " #I " must be a bool")));      \
+    return NanThrowTypeError("Argument " #I " must be a bool");                                      \
   bool VAR = args[I]->IsTrue();
 
 /**
@@ -34,7 +39,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define REQ_INT_ARG(I, VAR)                                                                          \
   if (args.Length() <= (I) || !args[I]->IsNumber())                                                  \
-    return ThrowException(Exception::TypeError(String::New("Argument " #I " must be an integer")));  \
+    return NanThrowTypeError("Argument " #I " must be an integer");                                  \
   int VAR = args[I]->NumberValue();
 
 /**
@@ -42,7 +47,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define REQ_STRING_ARG(I, VAR)                                                                       \
   if (args.Length() <= (I) || !args[I]->IsString())                                                  \
-    return ThrowException(Exception::TypeError(String::New("Argument " #I " must be a string")));    \
+    return NanThrowTypeError("Argument " #I " must be a string");                                    \
   Local<String> VAR = Local<String>::Cast(args[I]);
 
 /**
@@ -50,7 +55,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define REQ_ARRAY_ARG(I, VAR)                                                                        \
   if (args.Length() <= (I) || !args[I]->IsArray())                                                   \
-    return ThrowException(Exception::TypeError(String::New("Argument " #I " must be an array")));    \
+    return NanThrowTypeError("Argument " #I " must be an array");                                    \
   Local<Array> VAR = Local<Array>::Cast(args[I]);
 
 /**
@@ -58,7 +63,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define REQ_FUN_ARG(I, VAR)                                                                          \
   if (args.Length() <= (I) || !args[I]->IsFunction())                                                \
-    return ThrowException(Exception::TypeError(String::New("Argument " #I " must be a function")));  \
+    return NanThrowTypeError("Argument " #I " must be a function");                                  \
   Local<Function> VAR = Local<Function>::Cast(args[I]);
 
 /**
@@ -66,7 +71,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define REQ_OBJECT_ARG(I, VAR)                                                                       \
   if (args.Length() <= (I) || !args[I]->IsObject())                                                  \
-    return ThrowException(Exception::TypeError(String::New("Argument " #I " must be an object")));   \
+    return NanThrowTypeError("Argument " #I " must be an object");                                   \
   Local<Object> VAR = Local<Object>::Cast(args[I]);
 
 /**
@@ -100,3 +105,4 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
   }
 
 #endif
+
