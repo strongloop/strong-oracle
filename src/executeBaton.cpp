@@ -5,10 +5,9 @@
 #include <iostream>
 
 using namespace std;
-using namespace v8;
 
 ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql,
-    Local<Array>* values, Handle<Function>* callback) {
+    v8::Local<v8::Array>* values, Handle<v8::Function>* callback) {
   this->connection = connection;
   this->sql = sql;
   if (callback != NULL) {
@@ -39,15 +38,15 @@ ExecuteBaton::~ExecuteBaton() {
 
 }
 
-double CallDateMethod(Local<Date> date, const char* methodName) {
+double CallDateMethod(v8::Local<Date> date, const char* methodName) {
   Handle<Value> args[1]; // should be zero but on windows the compiler will not allow a zero length array
-  Local<Value> result = Local<Function>::Cast(
+  v8::Local<Value> result = v8::Local<v8::Function>::Cast(
       date->Get(String::New(methodName)))->Call(date, 0, args);
-  return Local<Number>::Cast(result)->Value();
+  return v8::Local<v8::Number>::Cast(result)->Value();
 }
 
 oracle::occi::Date* V8DateToOcciDate(oracle::occi::Environment* env,
-    Local<Date> val) {
+    v8::Local<Date> val) {
   int year = CallDateMethod(val, "getFullYear");
   int month = CallDateMethod(val, "getMonth") + 1;
   int day = CallDateMethod(val, "getDate");
@@ -60,10 +59,10 @@ oracle::occi::Date* V8DateToOcciDate(oracle::occi::Environment* env,
 }
 
 void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
-    Local<Array>* values) {
+    v8::Local<v8::Array>* values) {
 
   for (uint32_t i = 0; i < (*values)->Length(); i++) {
-    Local<Value> val = (*values)->Get(i);
+    v8::Local<Value> val = (*values)->Get(i);
     value_t *value = new value_t();
 
     // null
@@ -85,14 +84,14 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     else if (val->IsDate()) {
       value->type = VALUE_TYPE_DATE;
       value->value = V8DateToOcciDate(baton->connection->getEnvironment(),
-          DateCast(val));
+          val.As<Date>());
       baton->values.push_back(value);
     }
 
     // number
     else if (val->IsNumber()) {
       value->type = VALUE_TYPE_NUMBER;
-      double d = Number::Cast(*val)->Value();
+      double d = v8::Number::Cast(*val)->Value();
       value->value = new oracle::occi::Number(d); // XXX not deleted in dtor
       baton->values.push_back(value);
     }
@@ -100,7 +99,7 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     // Buffer
     else if (node::Buffer::HasInstance(val)) {
       value->type = VALUE_TYPE_CLOB;
-      Local<Object> buffer = val->ToObject();
+      v8::Local<Object> buffer = val->ToObject();
       size_t length = node::Buffer::Length(buffer);
       uint8_t* data = (uint8_t*) node::Buffer::Data(buffer);
 
