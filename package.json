@@ -1,7 +1,11 @@
 {
   "name": "strong-oracle",
   "description": "Oracle database driver",
-  "keywords": ["database", "db", "oracle"],
+  "keywords": [
+    "database",
+    "db",
+    "oracle"
+  ],
   "homepage": "https://github.com/strongloop/strong-oracle",
   "version": "1.0.0",
   "engines": {
@@ -21,6 +25,7 @@
     "url": "git://github.com/strongloop/strong-oracle.git"
   },
   "dependencies": {
+    "nan": "~0.8.0"
   },
   "devDependencies": {
     "nodeunit": "~>0.8.6"

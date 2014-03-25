@@ -1,4 +1,3 @@
-
 #ifndef _nodeOracleException_h_
 #define _nodeOracleException_h_
 
@@ -6,9 +5,12 @@
 
 class NodeOracleException {
 public:
-  NodeOracleException(std::string message) : m_message(message) {
+  NodeOracleException(std::string message) :
+      m_message(message) {
   }
-  std::string getMessage() { return m_message; }
+  std::string getMessage() {
+    return m_message;
+  }
 
 private:
   std::string m_message;

@@ -1,4 +1,3 @@
-
 #ifndef _commit_baton_h_
 #define _commit_baton_h_
 
@@ -6,16 +5,16 @@
 
 class CommitBaton {
 public:
-  CommitBaton(Connection* connection, v8::Handle<v8::Function>* callback) {
+  CommitBaton(Connection* connection, const v8::Handle<v8::Function>& callback) {
     this->connection = connection;
-    this->callback = Persistent<Function>::New(*callback);
+    this->callback = new NanCallback(callback);
   }
   ~CommitBaton() {
-    callback.Dispose();
+    delete callback;
   }
 
   Connection *connection;
-  v8::Persistent<v8::Function> callback;
+  NanCallback *callback;
 };
 
 #endif
