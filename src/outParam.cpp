@@ -1,6 +1,6 @@
 #include "outParam.h"
 #include "nodeOracleException.h"
-#include <iostream>
+
 using namespace std;
 
 Persistent<FunctionTemplate> OutParam::constructorTemplate;
@@ -20,7 +20,7 @@ void OutParam::Init(Handle<Object> target) {
   Local<FunctionTemplate> t = FunctionTemplate::New(New);
   NanAssignPersistent(FunctionTemplate, constructorTemplate, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(String::NewSymbol("OutParam"));
+  t->SetClassName(NanSymbol("OutParam"));
   target->Set(NanSymbol("OutParam"),
       t->GetFunction());
 }
@@ -28,6 +28,7 @@ void OutParam::Init(Handle<Object> target) {
 NAN_METHOD(OutParam::New) {
   NanScope();
   OutParam *outParam = new OutParam();
+  outParam->Wrap(args.This());
 
   if (args.Length() >= 1) {
     outParam->_type =
@@ -69,7 +70,6 @@ NAN_METHOD(OutParam::New) {
       }
     }
   }
-  outParam->Wrap(args.This());
   NanReturnValue(args.This());
 }
 

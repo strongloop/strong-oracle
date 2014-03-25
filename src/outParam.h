@@ -23,6 +23,12 @@ struct inout_t {
   oracle::occi::Number numberVal;
 };
 
+struct outparam_t {
+  int type;
+  int size;
+  inout_t inOut;
+};
+
 /**
  * Oracle out parameter
  */
@@ -40,12 +46,22 @@ public:
   int type();
   int size();
 
-  // Make Ref and Unref public so that ExecuteBaton can call them
-  void Ref() {
-    ObjectWrap::Ref();
-  }
-  void Unref() {
-    ObjectWrap::Unref();
+  /**
+   * Create a copy of the outparam to C style struct
+   */
+  outparam_t* c_outparam() {
+    outparam_t* p = new outparam_t();
+    p->type = _type;
+    p->size = _size;
+    p->inOut.hasInParam = _inOut.hasInParam;
+    p->inOut.stringVal = _inOut.stringVal;
+    p->inOut.intVal = _inOut.intVal;
+    p->inOut.doubleVal = _inOut.doubleVal;
+    p->inOut.floatVal = _inOut.floatVal;
+    p->inOut.dateVal = _inOut.dateVal;
+    p->inOut.timestampVal = _inOut.timestampVal;
+    p->inOut.numberVal = _inOut.numberVal;
+    return p;
   }
 
   static const int OCCIINT = 0;

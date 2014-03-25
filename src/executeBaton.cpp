@@ -119,11 +119,10 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     else if (NanHasInstance(OutParam::constructorTemplate, val)) {
 
       OutParam* op = node::ObjectWrap::Unwrap<OutParam>(val->ToObject());
-      op->Ref();
 
       // [rfeng] The OutParam object will be destroyed. We need to create a new copy.
       value->type = VALUE_TYPE_OUTPUT;
-      value->value = op;
+      value->value = op->c_outparam();
       baton->values.push_back(value);
 
       output_t* output = new output_t();
