@@ -105,7 +105,10 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
 
       buffer_t* buf = new buffer_t();
       buf->length = length;
-      buf->data = data;
+
+      // Copy the buffer to a new array as the original copy can be GCed
+      buf->data = new uint8_t[length];
+      memcpy(buf->data, data, length);
 
       value->value = buf;
       baton->values.push_back(value);
