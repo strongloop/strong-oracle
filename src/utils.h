@@ -104,15 +104,5 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
     }                                                                                                \
   }
 
-#if NODE_MODULE_VERSION >= 0x000D
-  inline Local<Date> DateCast(Local<Value> date) {
-    return Local<Date>::Cast(date);
-  }
-#else
-  inline Local<Date> DateCast(Local<Value> date) {
-    return Date::Cast(*date);
-  }
-#endif
-
 #endif
 

@@ -672,7 +672,7 @@ Local<Date> OracleDateToV8Date(oracle::occi::Date* d) {
   int year;
   unsigned int month, day, hour, min, sec;
   d->getDate(year, month, day, hour, min, sec);
-  Local<Date> date = DateCast(Date::New(0.0));
+  Local<Date> date = Date::New(0.0).As<Date>();
   CallDateMethod(date, "setUTCMilliseconds", 0);
   CallDateMethod(date, "setUTCSeconds", sec);
   CallDateMethod(date, "setUTCMinutes", min);
@@ -688,7 +688,7 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
   unsigned int month, day, hour, min, sec, fs, ms;
   d->getDate(year, month, day);
   d->getTime(hour, min, sec, fs);
-  Local<Date> date = DateCast(Date::New(0.0));
+  Local<Date> date = Date::New(0.0).As<Date>();
   //occi always returns nanoseconds, regardless of precision set on timestamp column
   ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
 
