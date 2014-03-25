@@ -4,6 +4,8 @@
 #include "commitBaton.h"
 #include "rollbackBaton.h"
 #include "outParam.h"
+#include "statement.h"
+#include "reader.h"
 #include "node_buffer.h"
 #include <vector>
 #include <node_version.h>
@@ -11,6 +13,7 @@
 using namespace std;
 
 Persistent<FunctionTemplate> ConnectionPool::s_ct;
+Persistent<FunctionTemplate> Connection::s_ct;
 
 // ConnectionPool implementation
 ConnectionPool::ConnectionPool() :
@@ -200,8 +203,6 @@ void ConnectionPool::closeConnectionPool(
   }
 }
 
-Persistent<FunctionTemplate> Connection::s_ct;
-
 void Connection::Init(Handle<Object> target) {
   NanScope();
 
@@ -229,6 +230,43 @@ NAN_METHOD(Connection::New) {
   Connection *connection = new Connection();
   connection->Wrap(args.This());
   NanReturnValue(args.This());
+}
+
+NAN_METHOD(Connection::Prepare) {
+  NanScope();
+  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+
+  REQ_STRING_ARG(0, sql);
+
+  String::Utf8Value sqlVal(sql);
+
+  StatementBaton* baton = new StatementBaton(connection, *sqlVal, NULL);
+
+  Local<FunctionTemplate> ft = NanPersistentToLocal(Statement::s_ct);
+  Handle<Object> statementHandle = ft->GetFunction()->NewInstance();
+  Statement* statement = ObjectWrap::Unwrap<Statement>(statementHandle);
+  statement->setBaton(baton);
+
+  NanReturnValue(statementHandle);
+}
+
+NAN_METHOD(Connection::CreateReader) {
+  NanScope();
+  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+
+  REQ_STRING_ARG(0, sql);
+  REQ_ARRAY_ARG(1, values);
+
+  String::Utf8Value sqlVal(sql);
+
+  ReaderBaton* baton = new ReaderBaton(connection, *sqlVal, &values);
+
+  Local<FunctionTemplate> ft = NanPersistentToLocal(Reader::s_ct);
+  Local<Object> readerHandle = ft->GetFunction()->NewInstance();
+  Reader* reader = ObjectWrap::Unwrap<Reader>(readerHandle);
+  reader->setBaton(baton);
+
+  NanReturnValue(readerHandle);
 }
 
 Connection::Connection() :
@@ -610,101 +648,11 @@ void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
 void Connection::EIO_Execute(uv_work_t* req) {
   ExecuteBaton* baton = static_cast<ExecuteBaton*>(req->data);
 
-  baton->rows = NULL;
-  baton->error = NULL;
+  oracle::occi::Statement* stmt = CreateStatement(baton);
+  if (baton->error) return;
 
-  oracle::occi::Statement* stmt = NULL;
-  oracle::occi::ResultSet* rs = NULL;
-  try {
-    if (!baton->connection->m_connection) {
-      throw NodeOracleException("Connection already closed");
-    }
-    stmt = baton->connection->m_connection->createStatement(baton->sql);
-    stmt->setAutoCommit(baton->connection->m_autoCommit);
-    if (baton->connection->m_prefetchRowCount > 0)
-      stmt->setPrefetchRowCount(baton->connection->m_prefetchRowCount);
-    int outputParam = SetValuesOnStatement(stmt, baton->values);
+  ExecuteStatement(baton, stmt);
 
-    int status = stmt->execute();
-    if (status == oracle::occi::Statement::UPDATE_COUNT_AVAILABLE) {
-      baton->updateCount = stmt->getUpdateCount();
-      if (outputParam >= 0) {
-        for (vector<output_t*>::iterator iterator = baton->outputs->begin(),
-            end = baton->outputs->end(); iterator != end; ++iterator) {
-          output_t* output = *iterator;
-          oracle::occi::ResultSet* rs;
-          switch (output->type) {
-          case OutParam::OCCIINT:
-            output->intVal = stmt->getInt(output->index);
-            break;
-          case OutParam::OCCISTRING:
-            output->strVal = string(stmt->getString(output->index));
-            break;
-          case OutParam::OCCIDOUBLE:
-            output->doubleVal = stmt->getDouble(output->index);
-            break;
-          case OutParam::OCCIFLOAT:
-            output->floatVal = stmt->getFloat(output->index);
-            break;
-          case OutParam::OCCICURSOR:
-            rs = stmt->getCursor(output->index);
-            CreateColumnsFromResultSet(rs, output->columns);
-            output->rows = new vector<row_t*>();
-            while (rs->next()) {
-              row_t* row = CreateRowFromCurrentResultSetRow(rs,
-                  output->columns);
-              output->rows->push_back(row);
-            }
-            break;
-          case OutParam::OCCICLOB:
-            output->clobVal = stmt->getClob(output->index);
-            break;
-          case OutParam::OCCIBLOB:
-            output->blobVal = stmt->getBlob(output->index);
-            break;
-          case OutParam::OCCIDATE:
-            output->dateVal = stmt->getDate(output->index);
-            break;
-          case OutParam::OCCITIMESTAMP:
-            output->timestampVal = stmt->getTimestamp(output->index);
-            break;
-          case OutParam::OCCINUMBER:
-            output->numberVal = stmt->getNumber(output->index);
-            break;
-          default:
-            char msg[128];
-            snprintf(msg, sizeof(msg), "Unknown OutParam type: %d",
-                output->type);
-            std::string strMsg = std::string(msg);
-            throw NodeOracleException(strMsg);
-            break;
-          }
-        }
-      }
-    } else if (status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
-      rs = stmt->getResultSet();
-      CreateColumnsFromResultSet(rs, baton->columns);
-      baton->rows = new vector<row_t*>();
-
-      while (rs->next()) {
-        row_t* row = CreateRowFromCurrentResultSetRow(rs, baton->columns);
-        baton->rows->push_back(row);
-      }
-    }
-  } catch (oracle::occi::SQLException &ex) {
-    baton->error = new string(ex.getMessage());
-  } catch (NodeOracleException &ex) {
-    baton->error = new string(ex.getMessage());
-  } catch (const exception& ex) {
-    baton->error = new string(ex.what());
-  } catch (...) {
-    baton->error = new string("Unknown exception thrown from OCCI");
-  }
-
-  if (stmt && rs) {
-    stmt->closeResultSet(rs);
-    rs = NULL;
-  }
   if (stmt) {
     if (baton->connection->m_connection) {
       baton->connection->m_connection->terminateStatement(stmt);
@@ -1053,3 +1001,117 @@ NAN_METHOD(Connection::ExecuteSync) {
   delete baton;
   NanReturnValue(argv[1]);
 }
+
+
+oracle::occi::Statement* Connection::CreateStatement(ExecuteBaton* baton) {
+  baton->rows = NULL;
+  baton->error = NULL;
+
+  if (! baton->connection->m_connection) {
+    baton->error = new std::string("Connection already closed");
+    return NULL;
+  }
+  try {
+    oracle::occi::Statement* stmt = baton->connection->m_connection->createStatement(baton->sql);
+    stmt->setAutoCommit(baton->connection->m_autoCommit);
+    if (baton->connection->m_prefetchRowCount > 0) stmt->setPrefetchRowCount(baton->connection->m_prefetchRowCount);
+    return stmt;
+  } catch(oracle::occi::SQLException &ex) {
+    baton->error = new string(ex.getMessage());
+    return NULL;
+  }
+}
+
+void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* stmt) {
+  oracle::occi::ResultSet* rs = NULL;
+
+  int outputParam = SetValuesOnStatement(stmt, baton->values);
+  if (baton->error) goto cleanup;
+
+  if (!baton->outputs) baton->outputs = new std::vector<output_t*>();
+
+  try {
+    int status = stmt->execute();
+    if(status == oracle::occi::Statement::UPDATE_COUNT_AVAILABLE) {
+      baton->updateCount = stmt->getUpdateCount();
+      if(outputParam >= 0) {
+        for (vector<output_t*>::iterator iterator = baton->outputs->begin(), end = baton->outputs->end(); iterator != end; ++iterator) {
+          output_t* output = *iterator;
+          oracle::occi::ResultSet* rs;
+          switch(output->type) {
+            case OutParam::OCCIINT:
+              output->intVal = stmt->getInt(output->index);
+              break;
+            case OutParam::OCCISTRING:
+              output->strVal = string(stmt->getString(output->index));
+              break;
+            case OutParam::OCCIDOUBLE:
+              output->doubleVal = stmt->getDouble(output->index);
+              break;
+            case OutParam::OCCIFLOAT:
+              output->floatVal = stmt->getFloat(output->index);
+              break;
+            case OutParam::OCCICURSOR:
+              rs = stmt->getCursor(output->index);
+              CreateColumnsFromResultSet(rs, output->columns);
+              if (baton->error) goto cleanup;
+              output->rows = new vector<row_t*>();
+              while(rs->next()) {
+                row_t* row = CreateRowFromCurrentResultSetRow(rs, output->columns);
+                if (baton->error) goto cleanup;
+                output->rows->push_back(row);
+              }
+              break;
+            case OutParam::OCCICLOB:
+              output->clobVal = stmt->getClob(output->index);
+              break;
+            case OutParam::OCCIBLOB:
+              output->blobVal = stmt->getBlob(output->index);
+              break;
+            case OutParam::OCCIDATE:
+              output->dateVal = stmt->getDate(output->index);
+              break;
+            case OutParam::OCCITIMESTAMP:
+              output->timestampVal = stmt->getTimestamp(output->index);
+              break;
+            case OutParam::OCCINUMBER:
+              output->numberVal = stmt->getNumber(output->index);
+              break;
+            default:
+              {
+                ostringstream oss;
+                oss << "Unknown OutParam type: " << output->type;
+                baton->error = new std::string(oss.str());
+                goto cleanup;
+              }
+          }
+        }
+      }
+    } else if(status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
+      rs = stmt->getResultSet();
+      CreateColumnsFromResultSet(rs, baton->columns);
+      if (baton->error) goto cleanup;
+      baton->rows = new vector<row_t*>();
+
+      while(rs->next()) {
+        row_t* row = CreateRowFromCurrentResultSetRow(rs, baton->columns);
+        if (baton->error) goto cleanup;
+        baton->rows->push_back(row);
+      }
+    }
+  } catch (oracle::occi::SQLException &ex) {
+    baton->error = new string(ex.getMessage());
+  } catch (NodeOracleException &ex) {
+    baton->error = new string(ex.getMessage());
+  } catch (const exception& ex) {
+    baton->error = new string(ex.what());
+  } catch (...) {
+    baton->error = new string("Unknown exception thrown from OCCI");
+  }
+cleanup:
+  if (rs) {
+    stmt->closeResultSet(rs);
+    rs = NULL;
+  }
+}
+

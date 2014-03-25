@@ -2,6 +2,8 @@
 #include "oracle_bindings.h"
 #include "connection.h"
 #include "outParam.h"
+#include "reader.h"
+#include "statement.h"
 #include <iostream>
 
 Persistent<FunctionTemplate> OracleClient::s_ct;
@@ -331,6 +333,8 @@ extern "C" {
     ConnectionPool::Init(target);
     Connection::Init(target);
     OutParam::Init(target);
+    Reader::Init(target);
+    Statement::Init(target);
   }
 
   NODE_MODULE(oracle_bindings, init);

@@ -83,7 +83,11 @@ public:
   std::string* error; // The error message
   int updateCount; // The update count
 
-private:
+  void ResetValues();
+  void ResetRows();
+  void ResetOutputs();
+  void ResetError();
+
   static void CopyValuesToBaton(ExecuteBaton* baton,
       v8::Local<v8::Array>* values);
 };

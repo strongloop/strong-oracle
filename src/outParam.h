@@ -41,8 +41,12 @@ public:
   int size();
 
   // Make Ref and Unref public so that ExecuteBaton can call them
-  void Ref();
-  void Unref();
+  void Ref() {
+    ObjectWrap::Ref();
+  }
+  void Unref() {
+    ObjectWrap::Unref();
+  }
 
   static const int OCCIINT = 0;
   static const int OCCISTRING = 1;

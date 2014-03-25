@@ -5,7 +5,9 @@
       "sources": [ "src/connection.cpp", 
                    "src/oracle_bindings.cpp", 
                    "src/executeBaton.cpp",
-                   "src/outParam.cpp" ],
+                   "src/outParam.cpp",
+                   "src/reader.cpp",
+                   "src/statement.cpp" ],
       "conditions": [
         ["OS=='mac'", {
           "xcode_settings": {

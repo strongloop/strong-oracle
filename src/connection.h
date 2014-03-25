@@ -42,6 +42,9 @@ public:
   static void EIO_Rollback(uv_work_t* req);
   static void EIO_AfterRollback(uv_work_t* req, int status);
 
+  static NAN_METHOD(Prepare);
+  static NAN_METHOD(CreateReader);
+
   static NAN_METHOD(SetAutoCommit);
   static NAN_METHOD(SetPrefetchRowCount);
   static NAN_METHOD(IsConnected);
@@ -53,6 +56,14 @@ public:
   Connection();
   ~Connection();
 
+  // Make Ref and Unref public so that ExecuteBaton can call them
+  void Ref() {
+    ObjectWrap::Ref();
+  }
+  void Unref() {
+    ObjectWrap::Unref();
+  }
+
   void setConnection(oracle::occi::Environment* environment,
       oracle::occi::StatelessConnectionPool* connectionPool,
       oracle::occi::Connection* connection);
@@ -61,7 +72,23 @@ public:
     return m_environment;
   }
 
-private:
+  oracle::occi::StatelessConnectionPool* getConnectionPool() {
+      return m_connectionPool;
+  }
+
+  oracle::occi::Connection* getConnection() {
+    return m_connection;
+  }
+
+  bool getAutoCommit() {
+    return m_autoCommit;
+  }
+
+  int getPrefetchRowCount() {
+    return m_prefetchRowCount;
+  }
+
+
   static int SetValuesOnStatement(oracle::occi::Statement* stmt,
       std::vector<value_t*> &values);
   static void CreateColumnsFromResultSet(oracle::occi::ResultSet* rs,
@@ -72,8 +99,14 @@ private:
       std::vector<row_t*>* rows);
   static Local<Object> CreateV8ObjectFromRow(std::vector<column_t*> columns,
       row_t* currentRow);
+
+  // shared with Statement
+  static oracle::occi::Statement* CreateStatement(ExecuteBaton* baton);
+  static void ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* stmt);
+
   static void handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]);
 
+private:
   // The OOCI environment
   oracle::occi::Environment* m_environment;
 

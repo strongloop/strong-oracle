@@ -32,37 +32,11 @@ ExecuteBaton::~ExecuteBaton() {
     delete col;
   }
 
-  for (vector<value_t*>::iterator iterator = values.begin(), end =
-      values.end(); iterator != end; ++iterator) {
+  ResetValues();
+  ResetRows();
+  ResetOutputs();
+  ResetError();
 
-    value_t* val = *iterator;
-    if (val->type == VALUE_TYPE_STRING) {
-      delete (string*) val->value;
-    }
-    delete val;
-  }
-
-  if (rows) {
-    for (vector<row_t*>::iterator iterator = rows->begin(), end =
-        rows->end(); iterator != end; ++iterator) {
-      row_t* currentRow = *iterator;
-      delete currentRow;
-    }
-
-    delete rows;
-  }
-
-  if (outputs) {
-    for (vector<output_t*>::iterator iterator = outputs->begin(), end =
-        outputs->end(); iterator != end; ++iterator) {
-      output_t* o = *iterator;
-      delete o;
-    }
-    delete outputs;
-  }
-
-  if (error)
-    delete error;
 }
 
 double CallDateMethod(Local<Date> date, const char* methodName) {
@@ -167,3 +141,54 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
 
   }
 }
+
+void ExecuteBaton::ResetValues() {
+  for (std::vector<value_t*>::iterator iterator = values.begin(), end = values.end(); iterator != end; ++iterator) {
+
+    value_t* val = *iterator;
+    switch (val->type) {
+      case VALUE_TYPE_STRING:
+        delete (std::string*)val->value;
+        break;
+      case VALUE_TYPE_NUMBER:
+        delete (oracle::occi::Number*)val->value;
+        break;
+      case VALUE_TYPE_TIMESTAMP:
+        delete (oracle::occi::Timestamp*)val->value;
+        break;
+    }
+    delete val;
+  }
+  values.clear();
+}
+
+void ExecuteBaton::ResetRows() {
+  if (rows) {
+    for (std::vector<row_t*>::iterator iterator = rows->begin(), end = rows->end(); iterator != end; ++iterator) {
+      row_t* currentRow = *iterator;
+      delete currentRow;
+    }
+
+    delete rows;
+    rows = NULL;
+  }
+}
+
+void ExecuteBaton::ResetOutputs() {
+  if (outputs) {
+    for (std::vector<output_t*>::iterator iterator = outputs->begin(), end = outputs->end(); iterator != end; ++iterator) {
+      output_t* o = *iterator;
+      delete o;
+    }
+    delete outputs;
+    outputs = NULL;
+  }
+}
+
+void ExecuteBaton::ResetError() {
+  if (error) {
+    delete error;
+    error = NULL;
+  }
+}
+
