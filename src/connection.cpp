@@ -768,7 +768,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
         int totalBytesRead = 0;
         while (numBytesRead != -1) {
           totalBytesRead += numBytesRead;
-          columnVal.append(buffer);
+          columnVal.append(buffer, numBytesRead);
           numBytesRead = instream->readBuffer(buffer, chunkSize);
         }
 
