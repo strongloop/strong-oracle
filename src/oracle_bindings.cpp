@@ -32,6 +32,7 @@ ConnectBaton::ConnectBaton(OracleClient* client, oracle::occi::Environment* envi
   this->incrConn = 1;
   this->timeout =0;
   this->busyOption = oracle::occi::StatelessConnectionPool::WAIT;
+  this->stmtCacheSize = 0;
 }
 
 ConnectBaton::~ConnectBaton() {
@@ -90,6 +91,7 @@ NAN_METHOD(OracleClient::Connect) {
   OBJ_GET_STRING(settings, "database", baton->database);
   OBJ_GET_NUMBER(settings, "port", baton->port, 1521);
   OBJ_GET_STRING(settings, "tns", baton->tns);
+  OBJ_GET_NUMBER(settings, "stmtCacheSize", baton->stmtCacheSize, 16);
 
   client->Ref();
 
@@ -114,6 +116,7 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
     }
     std::string connStr = std::string(connectionStr);
     baton->connection = baton->environment->createConnection(baton->user, baton->password, connStr);
+    baton->connection->setStmtCacheSize(baton->stmtCacheSize);
   } catch(oracle::occi::SQLException &ex) {
     baton->error = new std::string(ex.getMessage());
   } catch (const std::exception& ex) {
@@ -163,12 +166,14 @@ NAN_METHOD(OracleClient::ConnectSync) {
   OBJ_GET_STRING(settings, "password", baton.password);
   OBJ_GET_STRING(settings, "database", baton.database);
   OBJ_GET_NUMBER(settings, "port", baton.port, 1521);
+  OBJ_GET_NUMBER(settings, "stmtCacheSize", baton.stmtCacheSize, 16);
 
   try {
     char connectionStr[512];
     snprintf(connectionStr, sizeof(connectionStr), "//%s:%d/%s", baton.hostname.c_str(), baton.port, baton.database.c_str());
     std::string connStr = std::string(connectionStr);
     baton.connection = baton.environment->createConnection(baton.user, baton.password, connStr);
+    baton.connection->setStmtCacheSize(baton.stmtCacheSize);
   } catch(oracle::occi::SQLException &ex) {
     return NanThrowError(ex.getMessage().c_str());
   } catch (const std::exception& ex) {
@@ -192,7 +197,7 @@ NAN_METHOD(OracleClient::CreateConnectionPoolSync) {
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
 
   std::string hostname, user, password, database, tns;
-  unsigned int port, minConn, maxConn, incrConn, timeout, busyOption;
+  unsigned int port, minConn, maxConn, incrConn, timeout, busyOption, stmtCacheSize;
 
   OBJ_GET_STRING(settings, "hostname", hostname);
   OBJ_GET_STRING(settings, "user", user);
@@ -205,6 +210,7 @@ NAN_METHOD(OracleClient::CreateConnectionPoolSync) {
   OBJ_GET_NUMBER(settings, "timeout", timeout, 0);
   OBJ_GET_NUMBER(settings, "busyOption", busyOption, 0);
   OBJ_GET_STRING(settings, "tns", tns);
+  OBJ_GET_NUMBER(settings, "stmtCacheSize", stmtCacheSize, 16);
 
   try {
     char connectionStr[512];
@@ -220,6 +226,7 @@ NAN_METHOD(OracleClient::CreateConnectionPoolSync) {
                                     oracle::occi::StatelessConnectionPool::HOMOGENEOUS);
     scp->setTimeOut(timeout);
     scp->setBusyOption(static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption));
+    scp->setStmtCacheSize(stmtCacheSize);
 
     Local<FunctionTemplate> ft = NanPersistentToLocal(ConnectionPool::s_ct);
     Handle<Object> connectionPool = ft->GetFunction()->NewInstance();
@@ -256,6 +263,7 @@ NAN_METHOD(OracleClient::CreateConnectionPool) {
   OBJ_GET_NUMBER(settings, "busyOption", busyOption, 0);
   baton->busyOption = static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption);
   OBJ_GET_STRING(settings, "tns", baton->tns);
+  OBJ_GET_NUMBER(settings, "stmtCacheSize", baton->stmtCacheSize, 16);
 
 
   client->Ref();
@@ -290,6 +298,7 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
                                     oracle::occi::StatelessConnectionPool::HOMOGENEOUS);
     scp->setTimeOut(baton->timeout);
     scp->setBusyOption(baton->busyOption);
+    scp->setStmtCacheSize(baton->stmtCacheSize);
     baton->connectionPool = scp;
 
   } catch(oracle::occi::SQLException &ex) {
