@@ -138,7 +138,10 @@ public:
    * timeout
    */
   uint32_t timeout;
-
+  /**
+   * Statement cache size
+   */
+  uint32_t stmtCacheSize;
   /**
    * OCCI stateless connection pool's busy  option
    */
