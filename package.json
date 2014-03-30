@@ -28,10 +28,10 @@
     "nan": "~0.8.0"
   },
   "devDependencies": {
-    "nodeunit": "~>0.8.6"
+    "mocha": "~1.18.2"
   },
   "scripts": {
-    "test": "nodeunit test/integration.js test/outparams.js"
+    "test": "./node_modules/.bin/mocha -R spec --timeout 10000 test/*.js"
   },
   "main": "./index.js",
   "license": {
