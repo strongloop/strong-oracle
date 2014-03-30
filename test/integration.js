@@ -104,13 +104,13 @@ describe('oracle driver', function () {
     var self = this;
     self.connection.execute("INSERT INTO person (name) VALUES (:1) RETURNING id INTO :2",
       ["Bill O'Neil", new oracle.OutParam()], function (err, results) {
-      if (err) {
-        console.error(err);
-        return;
-      }
-      assert(results.returnParam > 0);
-      done();
-    });
+        if (err) {
+          console.error(err);
+          return;
+        }
+        assert(results.returnParam > 0);
+        done();
+      });
   });
 
   it("should support datatypes with valid values", function (done) {
@@ -207,6 +207,55 @@ describe('oracle driver', function () {
           assert.equal(results[0]['TBLOB'], null);
           done();
         });
+      });
+  });
+
+  it("should support date_types_insert_milliseconds", function (done) {
+    var self = this,
+      date = new Date(2013, 11, 24, 1, 2, 59, 999);
+
+    self.connection.execute(
+      "INSERT INTO datatype_test (tdate, ttimestamp) VALUES (:1, :2)",
+      [date, date],
+      function (err, results) {
+        if (err) {
+          console.error(err);
+          return;
+        }
+        assert(results.updateCount === 1);
+
+        self.connection.execute("SELECT tdate, ttimestamp FROM datatype_test",
+          [], function (err, results) {
+            if (err) {
+              console.error(err);
+              return;
+            }
+            assert.equal(results.length, 1);
+            var dateWithoutMs = new Date(date);
+            dateWithoutMs.setMilliseconds(0);
+            assert.equal(results[0]['TDATE'].getTime(), dateWithoutMs.getTime(),
+              "Milliseconds should not be stored for DATE");
+            assert.equal(results[0]['TTIMESTAMP'].getTime(), date.getTime(),
+              "Milliseconds should be stored for TIMESTAMP");
+            done();
+          });
+      });
+  });
+
+  it("should support utf8_chars_in_query", function (done) {
+    var self = this,
+      cyrillicString = "тест";
+
+    self.connection.execute("SELECT '" + cyrillicString + "' as test FROM DUAL",
+      [], function (err, results) {
+        if (err) {
+          console.error(err);
+          return;
+        }
+        assert.equal(results.length, 1);
+        assert.equal(results[0]['TEST'], cyrillicString,
+          "UTF8 characters in sql query should be preserved");
+        done();
       });
   });
 });
