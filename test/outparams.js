@@ -97,23 +97,23 @@ var assert = require('assert');
 var settings = require('../tests-settings.json');
 
 describe('stored procedures with out params', function () {
-  beforeEach(function (callback) {
+  beforeEach(function (done) {
     var self = this;
     oracle.connect(settings, function (err, connection) {
       if (err) {
-        callback(err);
+        done(err);
         return;
       }
       self.connection = connection;
-      callback();
+      done();
     });
   });
 
-  afterEach(function (callback) {
+  afterEach(function (done) {
     if (this.connection) {
       this.connection.close();
     }
-    callback();
+    done();
   });
 
   it("should support multiple out params", function (done) {

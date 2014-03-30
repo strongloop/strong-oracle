@@ -40,7 +40,7 @@ var assert = require('assert');
 var settings = require('../tests-settings.json');
 
 describe('oracle driver', function () {
-  beforeEach(function (callback) {
+  beforeEach(function (done) {
     var self = this;
     //console.log("connecting: ", settings);
     oracle.connect(settings, function (err, connection) {
@@ -61,17 +61,17 @@ describe('oracle driver', function () {
             return;
           }
           //console.log("rows deleted: ", results);
-          callback();
+          done();
         });
       });
     });
   });
 
-  afterEach(function (callback) {
+  afterEach(function (done) {
     if (this.connection) {
       this.connection.close();
     }
-    callback();
+    done();
   });
 
   it("should select with single quote", function (done) {
