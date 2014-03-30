@@ -8,7 +8,7 @@ function initDb(connection, done) {
     // ignore error
     connection.execute("CREATE TABLE test_table (X INT)", [], function (err) {
       if (err) {
-        throw err;
+        return done(err);
       }
       return done();
     });

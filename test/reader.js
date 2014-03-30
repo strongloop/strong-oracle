@@ -80,7 +80,7 @@ function testNextRows(done, connection, requested, len1, len2) {
 }
 
 describe('reader', function () {
-  beforeEach(function (done) {
+  before(function (done) {
     var self = this;
     oracle.connect(settings, function (err, connection) {
       if (err) {
@@ -91,7 +91,7 @@ describe('reader', function () {
     });
   });
 
-  afterEach(function (done) {
+  after(function (done) {
     if (this.connection) {
       this.connection.close();
     }

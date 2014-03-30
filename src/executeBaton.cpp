@@ -61,6 +61,10 @@ oracle::occi::Date* V8DateToOcciDate(oracle::occi::Environment* env,
 void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     v8::Local<v8::Array>* values) {
 
+  if (values == NULL) {
+    return;
+  }
+
   for (uint32_t i = 0; i < (*values)->Length(); i++) {
     v8::Local<Value> val = (*values)->Get(i);
     value_t *value = new value_t();

@@ -214,6 +214,8 @@ void Connection::Init(Handle<Object> target) {
 
   NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
   NODE_SET_PROTOTYPE_METHOD(t, "executeSync", ExecuteSync);
+  NODE_SET_PROTOTYPE_METHOD(t, "readerHandle", CreateReader);
+  NODE_SET_PROTOTYPE_METHOD(t, "prepare", Prepare);
   NODE_SET_PROTOTYPE_METHOD(t, "close", Connection::Close);
   NODE_SET_PROTOTYPE_METHOD(t, "isConnected", IsConnected);
   NODE_SET_PROTOTYPE_METHOD(t, "setAutoCommit", SetAutoCommit);
@@ -241,7 +243,6 @@ NAN_METHOD(Connection::Prepare) {
   String::Utf8Value sqlVal(sql);
 
   StatementBaton* baton = new StatementBaton(connection, *sqlVal, NULL);
-
   Local<FunctionTemplate> ft = NanPersistentToLocal(Statement::s_ct);
   Handle<Object> statementHandle = ft->GetFunction()->NewInstance();
   Statement* statement = ObjectWrap::Unwrap<Statement>(statementHandle);
