@@ -287,7 +287,7 @@ NAN_METHOD(Connection::Execute) {
   REQ_ARRAY_ARG(1, values);
   REQ_FUN_ARG(2, callback);
 
-  String::AsciiValue sqlVal(sql);
+  String::Utf8Value sqlVal(sql);
 
   ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values,
       &callback);
@@ -427,6 +427,9 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt,
       break;
     case VALUE_TYPE_DATE:
       stmt->setDate(index, *((oracle::occi::Date*) val->value));
+      break;
+    case VALUE_TYPE_TIMESTAMP:
+      stmt->setTimestamp(index, *((oracle::occi::Timestamp*) val->value));
       break;
     case VALUE_TYPE_OUTPUT:
       outParam = static_cast<outparam_t*>(val->value);
@@ -977,7 +980,7 @@ NAN_METHOD(Connection::ExecuteSync) {
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
 
-  String::AsciiValue sqlVal(sql);
+  String::Utf8Value sqlVal(sql);
 
   ExecuteBaton* baton;
   try {
