@@ -21,7 +21,12 @@ ConnectionPool::ConnectionPool() :
 }
 
 ConnectionPool::~ConnectionPool() {
-  closeConnectionPool();
+  try {
+    closeConnectionPool(oracle::occi::StatelessConnectionPool::SPD_FORCE);
+  } catch (std::exception &ex) {
+    m_connectionPool = NULL;
+    fprintf(stderr, "%s\n", ex.what());
+  }
 }
 
 void ConnectionPool::Init(Handle<Object> target) {
@@ -276,7 +281,12 @@ Connection::Connection() :
 }
 
 Connection::~Connection() {
-  closeConnection();
+  try {
+    closeConnection();
+  } catch (std::exception &ex) {
+    m_connection = NULL;
+    fprintf(stderr, "%s\n", ex.what());
+  }
 }
 
 NAN_METHOD(Connection::Execute) {
