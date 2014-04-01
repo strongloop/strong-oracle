@@ -11,7 +11,8 @@
       "conditions": [
         ["OS=='mac'", {
           "xcode_settings": {
-            "GCC_ENABLE_CPP_EXCEPTIONS": "YES"
+            "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
+            "GCC_ENABLE_CPP_RTTI": "YES"
           },
           "variables": {
 			 "oci_include_dir%": "<!(if [ -z $OCI_INCLUDE_DIR ]; then echo \"/opt/instantclient/sdk/include/\"; else echo $OCI_INCLUDE_DIR; fi)",
