@@ -1,0 +1,17 @@
+dn: dc=com
+
+dn: dc=strongloop,dc=com
+
+# OracleContext
+dn: cn=OracleContext,dc=strongloop,dc=com
+objectClass: orclContext
+cn: OracleContext
+
+# demo, OracleContext 
+dn: cn=demo,cn=OracleContext,dc=strongloop,dc=com
+objectClass: top
+objectClass: orclService
+cn: demo
+orclNetDescString: (DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=))(ADDRESS=(PROTOCOL=TCP)(HOST=demo.strongloop.com)(PORT=1521))) 
+orclSid: XE
+orclServiceType: DB
