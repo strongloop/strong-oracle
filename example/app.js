@@ -1,16 +1,16 @@
 var ora = require('../lib/oracle');
 var settings = {
-  host:'localhost',
+  host:'demo.strongloop.com',
   database:'XE',
-  username:'scott',
-  password:'tiger',
+  username:'demo',
+  password:'L00pBack',
   minConn:1,
   maxConn:5,
   incrConn:1,
   timeout: 10
 };
 
-var sql = 'SELECT ID, NAME FROM PRODUCT';
+var sql = 'SELECT * FROM PRODUCT';
 // var pool = ora.createConnectionPoolSync(settings);
 
 ora.createConnectionPool(settings, function(err, pool) {

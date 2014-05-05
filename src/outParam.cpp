@@ -18,7 +18,7 @@ void OutParam::Init(Handle<Object> target) {
   NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  NanAssignPersistent(FunctionTemplate, constructorTemplate, t);
+  NanAssignPersistent(constructorTemplate, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(NanSymbol("OutParam"));
   target->Set(NanSymbol("OutParam"),

@@ -33,7 +33,7 @@ void ConnectionPool::Init(Handle<Object> target) {
   NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(ConnectionPool::New);
-  NanAssignPersistent(FunctionTemplate, ConnectionPool::s_ct, t);
+  NanAssignPersistent(ConnectionPool::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(NanSymbol("ConnectionPool"));
@@ -121,7 +121,7 @@ NAN_METHOD(ConnectionPool::GetConnectionSync) {
     // std::string tag = "strong-oracle";
     oracle::occi::Connection *conn =
         connectionPool->getConnectionPool()->getConnection("strong-oracle");
-    Local<FunctionTemplate> ft = NanPersistentToLocal(Connection::s_ct);
+    Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
         connectionPool->getEnvironment(), connectionPool->getConnectionPool(),
@@ -182,7 +182,7 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Local<FunctionTemplate> ft = NanPersistentToLocal(Connection::s_ct);
+    Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
         baton->environment, baton->connectionPool->getConnectionPool(),
@@ -212,7 +212,7 @@ void Connection::Init(Handle<Object> target) {
   NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(Connection::New);
-  NanAssignPersistent(FunctionTemplate, Connection::s_ct, t);
+  NanAssignPersistent(Connection::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(NanSymbol("Connection"));
@@ -248,7 +248,7 @@ NAN_METHOD(Connection::Prepare) {
   String::Utf8Value sqlVal(sql);
 
   StatementBaton* baton = new StatementBaton(connection, *sqlVal, NULL);
-  Local<FunctionTemplate> ft = NanPersistentToLocal(Statement::s_ct);
+  Local<FunctionTemplate> ft = NanNew(Statement::s_ct);
   Handle<Object> statementHandle = ft->GetFunction()->NewInstance();
   Statement* statement = ObjectWrap::Unwrap<Statement>(statementHandle);
   statement->setBaton(baton);
@@ -267,7 +267,7 @@ NAN_METHOD(Connection::CreateReader) {
 
   ReaderBaton* baton = new ReaderBaton(connection, *sqlVal, &values);
 
-  Local<FunctionTemplate> ft = NanPersistentToLocal(Reader::s_ct);
+  Local<FunctionTemplate> ft = NanNew(Reader::s_ct);
   Local<Object> readerHandle = ft->GetFunction()->NewInstance();
   Reader* reader = ObjectWrap::Unwrap<Reader>(readerHandle);
   reader->setBaton(baton);

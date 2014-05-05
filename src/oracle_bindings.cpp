@@ -55,7 +55,7 @@ void OracleClient::Init(Handle<Object> target) {
   NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  NanAssignPersistent(FunctionTemplate, OracleClient::s_ct, t);
+  NanAssignPersistent(OracleClient::s_ct, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(NanSymbol("OracleClient"));
 
@@ -138,7 +138,7 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Local<FunctionTemplate> ft = NanPersistentToLocal(Connection::s_ct);
+    Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->client->m_environment, NULL, baton->connection);
     argv[1] = connection;
@@ -180,7 +180,7 @@ NAN_METHOD(OracleClient::ConnectSync) {
     return NanThrowError(ex.what());
   }
 
-  Local<FunctionTemplate> ft = NanPersistentToLocal(Connection::s_ct);
+  Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
   Handle<Object> connection = ft->GetFunction()->NewInstance();
 
   (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.client->m_environment, NULL, baton.connection);
@@ -228,7 +228,7 @@ NAN_METHOD(OracleClient::CreateConnectionPoolSync) {
     scp->setBusyOption(static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption));
     scp->setStmtCacheSize(stmtCacheSize);
 
-    Local<FunctionTemplate> ft = NanPersistentToLocal(ConnectionPool::s_ct);
+    Local<FunctionTemplate> ft = NanNew(ConnectionPool::s_ct);
     Handle<Object> connectionPool = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
 
@@ -321,7 +321,7 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
     argv[1] = Undefined();
   } else {
     argv[0] = Undefined();
-    Local<FunctionTemplate> ft = NanPersistentToLocal(ConnectionPool::s_ct);
+    Local<FunctionTemplate> ft = NanNew(ConnectionPool::s_ct);
     Handle<Object> connectionPool = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(baton->client->m_environment, baton->connectionPool);
     argv[1] = connectionPool;

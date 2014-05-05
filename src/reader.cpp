@@ -11,7 +11,7 @@ void Reader::Init(Handle<Object> target) {
   NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  NanAssignPersistent(FunctionTemplate, Reader::s_ct, t);
+  NanAssignPersistent(Reader::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(String::NewSymbol("Reader"));

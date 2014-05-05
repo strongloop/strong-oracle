@@ -11,7 +11,7 @@ void Statement::Init(Handle<Object> target) {
   NanScope();
 
   Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  NanAssignPersistent(FunctionTemplate, Statement::s_ct, t);
+  NanAssignPersistent(Statement::s_ct, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(String::NewSymbol("Statement"));
 
