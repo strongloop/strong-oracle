@@ -6,20 +6,30 @@
 
 using namespace std;
 
-ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql,
-    v8::Local<v8::Array>* values, Handle<v8::Function>* callback) {
+void ExecuteBaton::init(Connection* connection, const char* sql,
+    v8::Local<v8::Array>* values, NanCallback *cb) {
   this->connection = connection;
   this->sql = sql;
-  if (callback != NULL) {
-    NanCallback *cb = new NanCallback(*callback);
-    this->callback = cb;
-  } else {
-    NanCallback *cb = new NanCallback();
-    this->callback = cb;
-  }
   this->outputs = new vector<output_t*>();
   this->error = NULL;
+  this->callback = cb;
   CopyValuesToBaton(this, values);
+}
+
+ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql,
+    v8::Local<v8::Array>* values, Handle<v8::Function>& callback) {
+  NanCallback *cb = NULL;
+  if (!callback.IsEmpty()) {
+    cb = new NanCallback(callback);
+  } else {
+    cb = NULL;
+  }
+  init(connection, sql, values, cb);
+}
+
+ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql,
+    v8::Local<v8::Array>* values) {
+  init(connection, sql, values, NULL);
 }
 
 ExecuteBaton::~ExecuteBaton() {

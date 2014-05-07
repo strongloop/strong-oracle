@@ -186,7 +186,7 @@ public:
       const v8::Handle<v8::Function>& callback) {
     this->environment = environment;
     this->connectionPool = connectionPool;
-    if(callback->IsUndefined()) {
+    if (callback->IsUndefined()) {
       this->callback = NULL;
     } else {
       this->callback = new NanCallback(callback);
@@ -197,6 +197,7 @@ public:
   }
 
   ~ConnectionPoolBaton() {
+    delete error;
     delete callback;
   }
 
@@ -212,7 +213,7 @@ class ConnectionBaton {
 public:
   ConnectionBaton(Connection* connection, const v8::Handle<v8::Function>& callback) {
     this->connection = connection;
-    if(callback->IsUndefined()) {
+    if (callback.IsEmpty() || callback->IsUndefined()) {
       this->callback = NULL;
     } else {
       this->callback = new NanCallback(callback);
@@ -220,6 +221,7 @@ public:
     this->error = NULL;
   }
   ~ConnectionBaton() {
+    delete error;
     delete callback;
   }
 
