@@ -1,8 +1,6 @@
 #include <string.h>
 #include "connection.h"
 #include "executeBaton.h"
-#include "commitBaton.h"
-#include "rollbackBaton.h"
 #include "outParam.h"
 #include "statement.h"
 #include "reader.h"
@@ -41,6 +39,7 @@ void ConnectionPool::Init(Handle<Object> target) {
   NODE_SET_PROTOTYPE_METHOD(t, "getConnectionSync", ConnectionPool::GetConnectionSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getConnection", ConnectionPool::GetConnection);
   NODE_SET_PROTOTYPE_METHOD(t, "close", ConnectionPool::Close);
+  NODE_SET_PROTOTYPE_METHOD(t, "closeSync", ConnectionPool::CloseSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getInfo", ConnectionPool::GetInfo);
 
   target->Set(NanSymbol("ConnectionPool"), t->GetFunction());
@@ -60,7 +59,7 @@ void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment,
   m_connectionPool = connectionPool;
 }
 
-NAN_METHOD(ConnectionPool::Close) {
+NAN_METHOD(ConnectionPool::CloseSync) {
   NanScope();
   try {
     ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
@@ -79,6 +78,75 @@ NAN_METHOD(ConnectionPool::Close) {
     NanReturnUndefined();
   } catch (const exception& ex) {
     return NanThrowError(ex.what());
+  }
+}
+
+NAN_METHOD(ConnectionPool::Close) {
+  NanScope();
+  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
+        args.This());
+
+  // Get the optional destroy mode
+  oracle::occi::StatelessConnectionPool::DestroyMode mode =
+      oracle::occi::StatelessConnectionPool::DEFAULT;
+  if (args.Length() >= 1 || args[0]->IsUint32()) {
+    mode =
+        static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(args[0]->Uint32Value());
+  }
+
+  Local<Function> callback = Local<Function>::Cast(Local<Value>::New(v8::Undefined()));
+  if (args.Length() == 1 && args[0]->IsFunction()) {
+    callback = Local<Function>::Cast(args[0]);
+  } else if(args.Length() > 1 && args[1]->IsFunction()) {
+    callback = Local<Function>::Cast(args[1]);
+  }
+
+  ConnectionPoolBaton* baton;
+  try {
+    baton = new ConnectionPoolBaton(connectionPool->getEnvironment(),
+        connectionPool, mode, callback);
+  } catch (NodeOracleException &ex) {
+    return NanThrowError(ex.getMessage().c_str());
+  }
+
+  uv_work_t* req = new uv_work_t();
+  req->data = baton;
+  uv_queue_work(uv_default_loop(), req, ConnectionPool::EIO_Close,
+      (uv_after_work_cb) ConnectionPool::EIO_AfterClose);
+
+  NanReturnUndefined();
+}
+
+void ConnectionPool::EIO_Close(uv_work_t* req) {
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  try {
+    baton->connectionPool->closeConnectionPool(baton->destroyMode);
+  } catch(const exception &ex) {
+    baton->error = new std::string(ex.what());
+    baton->connectionPool->m_connectionPool = NULL;
+  }
+}
+
+void ConnectionPool::EIO_AfterClose(uv_work_t* req, int status) {
+  NanScope();
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+
+  if(baton->callback != NULL) {
+    Handle<Value> argv[2];
+    if (baton->error) {
+      argv[0] = NanError(baton->error->c_str());
+      argv[1] = Undefined();
+    } else {
+      argv[0] = Undefined();
+      argv[1] = Undefined();
+    }
+    v8::TryCatch tryCatch;
+    baton->callback->Call(2, argv);
+    delete baton;
+
+    if (tryCatch.HasCaught()) {
+      node::FatalException(tryCatch);
+    }
   }
 }
 
@@ -142,7 +210,9 @@ NAN_METHOD(ConnectionPool::GetConnection) {
   ConnectionPoolBaton* baton;
   try {
     baton = new ConnectionPoolBaton(connectionPool->getEnvironment(),
-        connectionPool, callback);
+        connectionPool,
+        oracle::occi::StatelessConnectionPool::DEFAULT,
+        callback);
   } catch (NodeOracleException &ex) {
     return NanThrowError(ex.getMessage().c_str());
   }
@@ -222,6 +292,7 @@ void Connection::Init(Handle<Object> target) {
   NODE_SET_PROTOTYPE_METHOD(t, "readerHandle", CreateReader);
   NODE_SET_PROTOTYPE_METHOD(t, "prepare", Prepare);
   NODE_SET_PROTOTYPE_METHOD(t, "close", Connection::Close);
+  NODE_SET_PROTOTYPE_METHOD(t, "closeSync", Connection::CloseSync);
   NODE_SET_PROTOTYPE_METHOD(t, "isConnected", IsConnected);
   NODE_SET_PROTOTYPE_METHOD(t, "setAutoCommit", SetAutoCommit);
   NODE_SET_PROTOTYPE_METHOD(t, "setPrefetchRowCount", SetPrefetchRowCount);
@@ -315,7 +386,7 @@ NAN_METHOD(Connection::Execute) {
   NanReturnUndefined();
 }
 
-NAN_METHOD(Connection::Close) {
+NAN_METHOD(Connection::CloseSync) {
   NanScope();
   try {
     Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
@@ -344,9 +415,9 @@ NAN_METHOD(Connection::Commit) {
 
   REQ_FUN_ARG(0, callback);
 
-  CommitBaton* baton;
+  ConnectionBaton* baton;
   try {
-    baton = new CommitBaton(connection, callback);
+    baton = new ConnectionBaton(connection, callback);
   } catch (NodeOracleException &ex) {
     return NanThrowError(ex.getMessage().c_str());
   }
@@ -367,9 +438,9 @@ NAN_METHOD(Connection::Rollback) {
 
   REQ_FUN_ARG(0, callback);
 
-  RollbackBaton* baton;
+  ConnectionBaton* baton;
   try {
-    baton = new RollbackBaton(connection, callback);
+    baton = new ConnectionBaton(connection, callback);
   } catch (NodeOracleException &ex) {
     return NanThrowError(ex.getMessage().c_str());
   }
@@ -612,52 +683,81 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
   return row;
 }
 
+void Connection::EIO_AfterCall(uv_work_t* req, int status) {
+  NanScope();
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+
+  baton->connection->Unref();
+
+  if(baton->callback != NULL) {
+    Handle<Value> argv[2];
+    if (baton->error) {
+      argv[0] = NanError(baton->error->c_str());
+      argv[1] = Undefined();
+    } else {
+      argv[0] = Undefined();
+      argv[1] = Undefined();
+    }
+    v8::TryCatch tryCatch;
+    baton->callback->Call(2, argv);
+    delete baton;
+
+    if (tryCatch.HasCaught()) {
+      node::FatalException(tryCatch);
+    }
+  }
+}
+
 void Connection::EIO_Commit(uv_work_t* req) {
-  CommitBaton* baton = static_cast<CommitBaton*>(req->data);
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
 
   baton->connection->m_connection->commit();
 }
 
 void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
-  NanScope();
-  CommitBaton* baton = static_cast<CommitBaton*>(req->data);
-
-  baton->connection->Unref();
-
-  Handle<Value> argv[2];
-  argv[0] = Undefined();
-  v8::TryCatch tryCatch;
-  baton->callback->Call(1, argv);
-  delete baton;
-
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
-  }
-
+  Connection::EIO_AfterCall(req, status);
 }
 
 void Connection::EIO_Rollback(uv_work_t* req) {
-  RollbackBaton* baton = static_cast<RollbackBaton*>(req->data);
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
 
   baton->connection->m_connection->rollback();
 }
 
 void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
+  Connection::EIO_AfterCall(req, status);
+}
+
+NAN_METHOD(Connection::Close) {
   NanScope();
-  RollbackBaton* baton = static_cast<RollbackBaton*>(req->data);
+  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
-  baton->connection->Unref();
-
-  Handle<Value> argv[2];
-  argv[0] = Undefined();
-  v8::TryCatch tryCatch;
-  baton->callback->Call(1, argv);
-  delete baton;
-
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+  Local<Function> callback = Local<Function>::Cast(Local<Value>::New(v8::Undefined()));
+  if (args.Length() > 0 && args[0]->IsFunction()) {
+    callback = Local<Function>::Cast(args[0]);
   }
 
+  uv_work_t* req = new uv_work_t();
+  req->data = new ConnectionBaton(connection, callback);
+  uv_queue_work(uv_default_loop(), req, Connection::EIO_Close,
+      (uv_after_work_cb) Connection::EIO_AfterClose);
+
+  connection->Ref();
+
+  NanReturnUndefined();
+}
+
+void Connection::EIO_Close(uv_work_t* req) {
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+  try {
+    baton->connection->closeConnection();
+  } catch(const exception &ex) {
+    baton->error = new std::string(ex.what());
+  }
+}
+
+void Connection::EIO_AfterClose(uv_work_t* req, int status) {
+  Connection::EIO_AfterCall(req, status);
 }
 
 void Connection::EIO_Execute(uv_work_t* req) {
