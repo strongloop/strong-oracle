@@ -62,6 +62,8 @@ struct output_t {
   oracle::occi::Timestamp timestampVal;
   oracle::occi::Number numberVal;
   oracle::occi::Blob blobVal;
+  size_t bufLength;
+  uint8_t *bufVal;
 };
 
 /**

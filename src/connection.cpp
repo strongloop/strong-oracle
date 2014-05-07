@@ -664,11 +664,15 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
         row->values.push_back(
             new oracle::occi::Timestamp(rs->getTimestamp(colIndex)));
         break;
-      case VALUE_TYPE_CLOB:
-        row->values.push_back(new oracle::occi::Clob(rs->getClob(colIndex)));
+      case VALUE_TYPE_CLOB: {
+        oracle::occi::Clob clob = rs->getClob(colIndex);
+        row->values.push_back(Connection::readClob(clob));
+        }
         break;
-      case VALUE_TYPE_BLOB:
-        row->values.push_back(new oracle::occi::Blob(rs->getBlob(colIndex)));
+      case VALUE_TYPE_BLOB: {
+        oracle::occi::Blob blob = rs->getBlob(colIndex);
+        row->values.push_back(Connection::readBlob(blob));
+        }
         break;
       default:
         char msg[128];
@@ -854,62 +858,19 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
       }
         break;
       case VALUE_TYPE_CLOB: {
-        oracle::occi::Clob* v = (oracle::occi::Clob*) val;
-        v->open(oracle::occi::OCCI_LOB_READONLY);
-
-        switch (col->charForm) {
-        case SQLCS_IMPLICIT:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_IMPLICIT);
-          break;
-        case SQLCS_NCHAR:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_NCHAR);
-          break;
-        case SQLCS_EXPLICIT:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_EXPLICIT);
-          break;
-        case SQLCS_FLEXIBLE:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_FLEXIBLE);
-          break;
-        }
-
-        oracle::occi::Stream *instream = v->getStream(1, 0);
-        // chunk size is set when the table is created
-        size_t chunkSize = v->getChunkSize();
-        char *buffer = new char[chunkSize];
-        memset(buffer, 0, chunkSize);
-        std::string columnVal;
-        int numBytesRead = instream->readBuffer(buffer, chunkSize);
-        int totalBytesRead = 0;
-        while (numBytesRead != -1) {
-          totalBytesRead += numBytesRead;
-          columnVal.append(buffer, numBytesRead);
-          numBytesRead = instream->readBuffer(buffer, chunkSize);
-        }
-
-        v->closeStream(instream);
-        v->close();
-        obj->Set(String::New(col->name.c_str()),
-            String::New(columnVal.c_str(), totalBytesRead));
+        buffer_t *v = (buffer_t *) val;
+        obj->Set(String::New(col->name.c_str()), String::New((const char*)v->data, v->length));
+        delete[] v->data;
         delete v;
-        delete[] buffer;
       }
         break;
       case VALUE_TYPE_BLOB: {
-        oracle::occi::Blob* v = (oracle::occi::Blob*) val;
-        v->open(oracle::occi::OCCI_LOB_READONLY);
-        int blobLength = v->length();
-        oracle::occi::Stream *instream = v->getStream(1, 0);
-        char *buffer = new char[blobLength];
-        memset(buffer, 0, blobLength);
-        instream->readBuffer(buffer, blobLength);
-        v->closeStream(instream);
-        v->close();
-
+        buffer_t *v = (buffer_t *) val;
         // convert to V8 buffer
-        v8::Local<v8::Object> v8Buffer = NanBufferUse(buffer, blobLength);
+        v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)v->data, v->length);
         obj->Set(String::New(col->name.c_str()), v8Buffer);
+        delete[] v->data;
         delete v;
-        delete[] buffer;
         break;
       }
         break;
@@ -1012,32 +973,15 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
                 CreateV8ArrayFromRows(output->columns, output->rows));
             break;
           case OutParam::OCCICLOB: {
-            output->clobVal.open(oracle::occi::OCCI_LOB_READONLY);
-            int lobLength = output->clobVal.length();
-            oracle::occi::Stream* instream = output->clobVal.getStream(1, 0);
-            char *buffer = new char[lobLength];
-            memset(buffer, 0, lobLength);
-            instream->readBuffer(buffer, lobLength);
-            output->clobVal.closeStream(instream);
-            output->clobVal.close();
-            obj->Set(prop, String::New(buffer, lobLength));
-            delete[] buffer;
+            obj->Set(prop, String::New((const char *)output->bufVal, output->bufLength));
+            delete[] output->bufVal;
             break;
           }
           case OutParam::OCCIBLOB: {
-            output->blobVal.open(oracle::occi::OCCI_LOB_READONLY);
-            int lobLength = output->blobVal.length();
-            oracle::occi::Stream* instream = output->blobVal.getStream(1, 0);
-            char *buffer = new char[lobLength];
-            memset(buffer, 0, lobLength);
-            instream->readBuffer(buffer, lobLength);
-            output->blobVal.closeStream(instream);
-            output->blobVal.close();
-
             // convert to V8 buffer
-            v8::Local<v8::Object> v8Buffer = NanBufferUse(buffer, lobLength);
+            v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)output->bufVal, output->bufLength);
             obj->Set(prop, v8Buffer);
-            delete[] buffer;
+            delete[] output->bufVal;
             break;
           }
           case OutParam::OCCIDATE:
@@ -1137,6 +1081,65 @@ oracle::occi::Statement* Connection::CreateStatement(ExecuteBaton* baton) {
   }
 }
 
+buffer_t* Connection::readClob(oracle::occi::Clob& clobVal) {
+  clobVal.open(oracle::occi::OCCI_LOB_READONLY);
+  unsigned int lobLength = clobVal.length();
+  unsigned char* lob = new unsigned char[lobLength];
+  memset(lob, 0, lobLength);
+  unsigned int totalBytesRead = 0;
+  oracle::occi::Stream* instream = clobVal.getStream(1, 0);
+  // chunk size is set when the table is created
+  size_t chunkSize = clobVal.getChunkSize();
+  char* buffer = new char[chunkSize];
+  memset(buffer, 0, chunkSize);
+  int numBytesRead = 0;
+  while (numBytesRead != -1) {
+    numBytesRead = instream->readBuffer(buffer, chunkSize);
+    if (numBytesRead > 0) {
+      memcpy(lob + totalBytesRead, buffer, numBytesRead);
+      totalBytesRead += numBytesRead;
+    }
+  }
+  clobVal.closeStream(instream);
+  clobVal.close();
+  delete[] buffer;
+
+  buffer_t* b = new buffer_t();
+  b->data = lob;
+  b->length = totalBytesRead;
+
+  return b;
+}
+
+buffer_t* Connection::readBlob(oracle::occi::Blob& blobVal) {
+  blobVal.open(oracle::occi::OCCI_LOB_READONLY);
+  unsigned int lobLength = blobVal.length();
+  unsigned char* lob = new unsigned char[lobLength];
+  memset(lob, 0, lobLength);
+  unsigned int totalBytesRead = 0;
+  oracle::occi::Stream* instream = blobVal.getStream(1, 0);
+  // chunk size is set when the table is created
+  size_t chunkSize = blobVal.getChunkSize();
+  char* buffer = new char[chunkSize];
+  memset(buffer, 0, chunkSize);
+  int numBytesRead = 0;
+  while (numBytesRead != -1) {
+    numBytesRead = instream->readBuffer(buffer, chunkSize);
+    if (numBytesRead > 0) {
+      memcpy(lob + totalBytesRead, buffer, numBytesRead);
+      totalBytesRead += numBytesRead;
+    }
+  }
+  blobVal.closeStream(instream);
+  blobVal.close();
+  delete[] buffer;
+
+  buffer_t* b = new buffer_t();
+  b->data = lob;
+  b->length = totalBytesRead;
+  return b;
+}
+
 void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* stmt) {
   oracle::occi::ResultSet* rs = NULL;
 
@@ -1177,11 +1180,19 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
                 output->rows->push_back(row);
               }
               break;
-            case OutParam::OCCICLOB:
+            case OutParam::OCCICLOB: {
               output->clobVal = stmt->getClob(output->index);
+              buffer_t *buf = Connection::readClob(output->clobVal);
+              output->bufVal = buf->data;
+              output->bufLength = buf->length;
+              }
               break;
-            case OutParam::OCCIBLOB:
+            case OutParam::OCCIBLOB: {
               output->blobVal = stmt->getBlob(output->index);
+              buffer_t *buf = Connection::readBlob(output->blobVal);
+              output->bufVal = buf->data;
+              output->bufLength = buf->length;
+              }
               break;
             case OutParam::OCCIDATE:
               output->dateVal = stmt->getDate(output->index);
