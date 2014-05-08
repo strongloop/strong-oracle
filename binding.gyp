@@ -26,8 +26,10 @@
            "oci_include_dir%": "<!(if [ -z $OCI_INCLUDE_DIR ]; then echo \"/opt/instantclient/sdk/include/\"; else echo $OCI_INCLUDE_DIR; fi)",
            "oci_lib_dir%": "<!(if [ -z $OCI_LIB_DIR ]; then echo \"/opt/instantclient/\"; else echo $OCI_LIB_DIR; fi)",
           },
-          "libraries": [ "-locci", "-lclntsh", "-lnnz12" ],
-          "link_settings": {"libraries": [ "-L<(oci_lib_dir)"] }
+          "link_settings": {
+            "libraries": [ "-L<(oci_lib_dir)", "-lclntsh", "-lnnz12", "-locci" ],
+            "ldflags": [ "-Wl,-rpath,<(oci_lib_dir)" ],
+          },
         }],
         ["OS=='win'", {
           "configurations": {
