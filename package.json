@@ -31,7 +31,7 @@
     "mocha": "~1.18.2"
   },
   "scripts": {
-    "test": "./node_modules/.bin/mocha -R spec --timeout 10000 test/*.js"
+    "test": "env DYLD_BIND_AT_LAUNCH=1 LD_BIND_NOW=1 ./node_modules/.bin/mocha -R spec --timeout 10000 test/*.js"
   },
   "main": "./index.js",
   "license": {
