@@ -1,6 +1,6 @@
-var oracle = require("../");
-var assert = require('assert');
 var settings = require('../tests-settings.json');
+var oracle = require("../")(settings);
+var assert = require('assert');
 
 function initDb(connection, max, cb) {
   connection.setPrefetchRowCount(50);

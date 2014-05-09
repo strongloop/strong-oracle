@@ -34,10 +34,9 @@
  /
  */
 
-var oracle = require("../");
-var assert = require('assert');
-
 var settings = require('../tests-settings.json');
+var oracle = require("../")(settings);
+var assert = require('assert');
 
 describe('oracle driver', function () {
   beforeEach(function (done) {
