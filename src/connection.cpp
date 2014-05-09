@@ -1,8 +1,6 @@
 #include <string.h>
 #include "connection.h"
 #include "executeBaton.h"
-#include "commitBaton.h"
-#include "rollbackBaton.h"
 #include "outParam.h"
 #include "statement.h"
 #include "reader.h"
@@ -41,6 +39,7 @@ void ConnectionPool::Init(Handle<Object> target) {
   NODE_SET_PROTOTYPE_METHOD(t, "getConnectionSync", ConnectionPool::GetConnectionSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getConnection", ConnectionPool::GetConnection);
   NODE_SET_PROTOTYPE_METHOD(t, "close", ConnectionPool::Close);
+  NODE_SET_PROTOTYPE_METHOD(t, "closeSync", ConnectionPool::CloseSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getInfo", ConnectionPool::GetInfo);
 
   target->Set(NanSymbol("ConnectionPool"), t->GetFunction());
@@ -60,7 +59,7 @@ void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment,
   m_connectionPool = connectionPool;
 }
 
-NAN_METHOD(ConnectionPool::Close) {
+NAN_METHOD(ConnectionPool::CloseSync) {
   NanScope();
   try {
     ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
@@ -79,6 +78,76 @@ NAN_METHOD(ConnectionPool::Close) {
     NanReturnUndefined();
   } catch (const exception& ex) {
     return NanThrowError(ex.what());
+  }
+}
+
+NAN_METHOD(ConnectionPool::Close) {
+  NanScope();
+  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
+        args.This());
+
+  // Get the optional destroy mode
+  oracle::occi::StatelessConnectionPool::DestroyMode mode =
+      oracle::occi::StatelessConnectionPool::DEFAULT;
+  if (args.Length() >= 1 && args[0]->IsUint32()) {
+    mode =
+        static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(args[0]->Uint32Value());
+  }
+
+  Local<Function> callback = Local<Function>::Cast(Local<Value>::New(NanUndefined()));
+  if (args.Length() == 1 && args[0]->IsFunction()) {
+    callback = Local<Function>::Cast(args[0]);
+  } else if(args.Length() > 1 && args[1]->IsFunction()) {
+    callback = Local<Function>::Cast(args[1]);
+  }
+
+  ConnectionPoolBaton* baton;
+  try {
+    baton = new ConnectionPoolBaton(connectionPool->getEnvironment(),
+        connectionPool, mode, callback);
+  } catch (NodeOracleException &ex) {
+    return NanThrowError(ex.getMessage().c_str());
+  }
+
+  uv_work_t* req = new uv_work_t();
+  req->data = baton;
+  uv_queue_work(uv_default_loop(), req, ConnectionPool::EIO_Close,
+      (uv_after_work_cb) ConnectionPool::EIO_AfterClose);
+
+  NanReturnUndefined();
+}
+
+void ConnectionPool::EIO_Close(uv_work_t* req) {
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  try {
+    baton->connectionPool->closeConnectionPool(baton->destroyMode);
+  } catch(const exception &ex) {
+    baton->error = new std::string(ex.what());
+    baton->connectionPool->m_connectionPool = NULL;
+  }
+}
+
+void ConnectionPool::EIO_AfterClose(uv_work_t* req, int status) {
+  NanScope();
+  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+
+  if(baton->callback != NULL) {
+    Handle<Value> argv[2];
+    if (baton->error) {
+      argv[0] = NanError(baton->error->c_str());
+      argv[1] = NanUndefined();
+    } else {
+      argv[0] = NanUndefined();
+      argv[1] = NanUndefined();
+    }
+    v8::TryCatch tryCatch;
+    baton->callback->Call(2, argv);
+    delete baton;
+    delete req;
+
+    if (tryCatch.HasCaught()) {
+      node::FatalException(tryCatch);
+    }
   }
 }
 
@@ -142,7 +211,9 @@ NAN_METHOD(ConnectionPool::GetConnection) {
   ConnectionPoolBaton* baton;
   try {
     baton = new ConnectionPoolBaton(connectionPool->getEnvironment(),
-        connectionPool, callback);
+        connectionPool,
+        oracle::occi::StatelessConnectionPool::DEFAULT,
+        callback);
   } catch (NodeOracleException &ex) {
     return NanThrowError(ex.getMessage().c_str());
   }
@@ -179,9 +250,9 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
   Handle<Value> argv[2];
   if (baton->error) {
     argv[0] = NanError(baton->error->c_str());
-    argv[1] = Undefined();
+    argv[1] = NanUndefined();
   } else {
-    argv[0] = Undefined();
+    argv[0] = NanUndefined();
     Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
@@ -193,6 +264,7 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
   v8::TryCatch tryCatch;
   baton->callback->Call(2, argv);
   delete baton;
+  delete req;
 
   if (tryCatch.HasCaught()) {
     node::FatalException(tryCatch);
@@ -222,6 +294,7 @@ void Connection::Init(Handle<Object> target) {
   NODE_SET_PROTOTYPE_METHOD(t, "readerHandle", CreateReader);
   NODE_SET_PROTOTYPE_METHOD(t, "prepare", Prepare);
   NODE_SET_PROTOTYPE_METHOD(t, "close", Connection::Close);
+  NODE_SET_PROTOTYPE_METHOD(t, "closeSync", Connection::CloseSync);
   NODE_SET_PROTOTYPE_METHOD(t, "isConnected", IsConnected);
   NODE_SET_PROTOTYPE_METHOD(t, "setAutoCommit", SetAutoCommit);
   NODE_SET_PROTOTYPE_METHOD(t, "setPrefetchRowCount", SetPrefetchRowCount);
@@ -299,8 +372,7 @@ NAN_METHOD(Connection::Execute) {
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values,
-      &callback);
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values, callback);
   if (baton->error != NULL) {
     return NanThrowError(baton->error->c_str());
   }
@@ -315,7 +387,7 @@ NAN_METHOD(Connection::Execute) {
   NanReturnUndefined();
 }
 
-NAN_METHOD(Connection::Close) {
+NAN_METHOD(Connection::CloseSync) {
   NanScope();
   try {
     Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
@@ -344,9 +416,9 @@ NAN_METHOD(Connection::Commit) {
 
   REQ_FUN_ARG(0, callback);
 
-  CommitBaton* baton;
+  ConnectionBaton* baton;
   try {
-    baton = new CommitBaton(connection, callback);
+    baton = new ConnectionBaton(connection, callback);
   } catch (NodeOracleException &ex) {
     return NanThrowError(ex.getMessage().c_str());
   }
@@ -367,12 +439,7 @@ NAN_METHOD(Connection::Rollback) {
 
   REQ_FUN_ARG(0, callback);
 
-  RollbackBaton* baton;
-  try {
-    baton = new RollbackBaton(connection, callback);
-  } catch (NodeOracleException &ex) {
-    return NanThrowError(ex.getMessage().c_str());
-  }
+  ConnectionBaton* baton= new ConnectionBaton(connection, callback);
 
   uv_work_t* req = new uv_work_t();
   req->data = baton;
@@ -380,7 +447,6 @@ NAN_METHOD(Connection::Rollback) {
       (uv_after_work_cb) EIO_AfterRollback);
 
   connection->Ref();
-
   NanReturnUndefined();
 }
 
@@ -593,11 +659,15 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
         row->values.push_back(
             new oracle::occi::Timestamp(rs->getTimestamp(colIndex)));
         break;
-      case VALUE_TYPE_CLOB:
-        row->values.push_back(new oracle::occi::Clob(rs->getClob(colIndex)));
+      case VALUE_TYPE_CLOB: {
+        oracle::occi::Clob clob = rs->getClob(colIndex);
+        row->values.push_back(Connection::readClob(clob, col->charForm));
+        }
         break;
-      case VALUE_TYPE_BLOB:
-        row->values.push_back(new oracle::occi::Blob(rs->getBlob(colIndex)));
+      case VALUE_TYPE_BLOB: {
+        oracle::occi::Blob blob = rs->getBlob(colIndex);
+        row->values.push_back(Connection::readBlob(blob));
+        }
         break;
       default:
         char msg[128];
@@ -612,52 +682,82 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
   return row;
 }
 
+void Connection::EIO_AfterCall(uv_work_t* req, int status) {
+  NanScope();
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+
+  baton->connection->Unref();
+
+  if(baton->callback != NULL) {
+    Handle<Value> argv[2];
+    if (baton->error) {
+      argv[0] = NanError(baton->error->c_str());
+      argv[1] = NanUndefined();
+    } else {
+      argv[0] = NanUndefined();
+      argv[1] = NanUndefined();
+    }
+    v8::TryCatch tryCatch;
+    baton->callback->Call(2, argv);
+    delete baton;
+    delete req;
+
+    if (tryCatch.HasCaught()) {
+      node::FatalException(tryCatch);
+    }
+  }
+}
+
 void Connection::EIO_Commit(uv_work_t* req) {
-  CommitBaton* baton = static_cast<CommitBaton*>(req->data);
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
 
   baton->connection->m_connection->commit();
 }
 
 void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
-  NanScope();
-  CommitBaton* baton = static_cast<CommitBaton*>(req->data);
-
-  baton->connection->Unref();
-
-  Handle<Value> argv[2];
-  argv[0] = Undefined();
-  v8::TryCatch tryCatch;
-  baton->callback->Call(1, argv);
-  delete baton;
-
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
-  }
-
+  Connection::EIO_AfterCall(req, status);
 }
 
 void Connection::EIO_Rollback(uv_work_t* req) {
-  RollbackBaton* baton = static_cast<RollbackBaton*>(req->data);
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
 
   baton->connection->m_connection->rollback();
 }
 
 void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
+  Connection::EIO_AfterCall(req, status);
+}
+
+NAN_METHOD(Connection::Close) {
   NanScope();
-  RollbackBaton* baton = static_cast<RollbackBaton*>(req->data);
+  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
-  baton->connection->Unref();
-
-  Handle<Value> argv[2];
-  argv[0] = Undefined();
-  v8::TryCatch tryCatch;
-  baton->callback->Call(1, argv);
-  delete baton;
-
-  if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+  Local<Function> callback;
+  if (args.Length() > 0 && args[0]->IsFunction()) {
+    callback = Local<Function>::Cast(args[0]);
   }
 
+  uv_work_t* req = new uv_work_t();
+  req->data = new ConnectionBaton(connection, callback);
+  uv_queue_work(uv_default_loop(), req, Connection::EIO_Close,
+      (uv_after_work_cb) Connection::EIO_AfterClose);
+
+  connection->Ref();
+
+  NanReturnUndefined();
+}
+
+void Connection::EIO_Close(uv_work_t* req) {
+  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+  try {
+    baton->connection->closeConnection();
+  } catch(const exception &ex) {
+    baton->error = new std::string(ex.what());
+  }
+}
+
+void Connection::EIO_AfterClose(uv_work_t* req, int status) {
+  Connection::EIO_AfterCall(req, status);
 }
 
 void Connection::EIO_Execute(uv_work_t* req) {
@@ -754,62 +854,19 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
       }
         break;
       case VALUE_TYPE_CLOB: {
-        oracle::occi::Clob* v = (oracle::occi::Clob*) val;
-        v->open(oracle::occi::OCCI_LOB_READONLY);
-
-        switch (col->charForm) {
-        case SQLCS_IMPLICIT:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_IMPLICIT);
-          break;
-        case SQLCS_NCHAR:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_NCHAR);
-          break;
-        case SQLCS_EXPLICIT:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_EXPLICIT);
-          break;
-        case SQLCS_FLEXIBLE:
-          v->setCharSetForm(oracle::occi::OCCI_SQLCS_FLEXIBLE);
-          break;
-        }
-
-        oracle::occi::Stream *instream = v->getStream(1, 0);
-        // chunk size is set when the table is created
-        size_t chunkSize = v->getChunkSize();
-        char *buffer = new char[chunkSize];
-        memset(buffer, 0, chunkSize);
-        std::string columnVal;
-        int numBytesRead = instream->readBuffer(buffer, chunkSize);
-        int totalBytesRead = 0;
-        while (numBytesRead != -1) {
-          totalBytesRead += numBytesRead;
-          columnVal.append(buffer, numBytesRead);
-          numBytesRead = instream->readBuffer(buffer, chunkSize);
-        }
-
-        v->closeStream(instream);
-        v->close();
-        obj->Set(String::New(col->name.c_str()),
-            String::New(columnVal.c_str(), totalBytesRead));
+        buffer_t *v = (buffer_t *) val;
+        obj->Set(String::New(col->name.c_str()), String::New((const char*)v->data, v->length));
+        delete[] v->data;
         delete v;
-        delete[] buffer;
       }
         break;
       case VALUE_TYPE_BLOB: {
-        oracle::occi::Blob* v = (oracle::occi::Blob*) val;
-        v->open(oracle::occi::OCCI_LOB_READONLY);
-        int blobLength = v->length();
-        oracle::occi::Stream *instream = v->getStream(1, 0);
-        char *buffer = new char[blobLength];
-        memset(buffer, 0, blobLength);
-        instream->readBuffer(buffer, blobLength);
-        v->closeStream(instream);
-        v->close();
-
+        buffer_t *v = (buffer_t *) val;
         // convert to V8 buffer
-        v8::Local<v8::Object> v8Buffer = NanBufferUse(buffer, blobLength);
+        v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)v->data, v->length);
         obj->Set(String::New(col->name.c_str()), v8Buffer);
+        delete[] v->data;
         delete v;
-        delete[] buffer;
         break;
       }
         break;
@@ -853,25 +910,26 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
   } catch (NodeOracleException &ex) {
     Handle<Value> argv[2];
     argv[0] = NanError(ex.getMessage().c_str());
-    argv[1] = Undefined();
+    argv[1] = NanUndefined();
     baton->callback->Call(2, argv);
   } catch (const exception &ex) {
     Handle<Value> argv[2];
     argv[0] = NanError(ex.what());
-    argv[1] = Undefined();
+    argv[1] = NanUndefined();
     baton->callback->Call(2, argv);
   }
 
   delete baton;
+  delete req;
 }
 
 void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
   try {
     if (baton->error) {
       argv[0] = NanError(baton->error->c_str());
-      argv[1] = Undefined();
+      argv[1] = NanUndefined();
     } else {
-      argv[0] = Undefined();
+      argv[0] = NanUndefined();
       if (baton->rows) {
         argv[1] = CreateV8ArrayFromRows(baton->columns, baton->rows);
       } else {
@@ -912,32 +970,15 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
                 CreateV8ArrayFromRows(output->columns, output->rows));
             break;
           case OutParam::OCCICLOB: {
-            output->clobVal.open(oracle::occi::OCCI_LOB_READONLY);
-            int lobLength = output->clobVal.length();
-            oracle::occi::Stream* instream = output->clobVal.getStream(1, 0);
-            char *buffer = new char[lobLength];
-            memset(buffer, 0, lobLength);
-            instream->readBuffer(buffer, lobLength);
-            output->clobVal.closeStream(instream);
-            output->clobVal.close();
-            obj->Set(prop, String::New(buffer, lobLength));
-            delete[] buffer;
+            obj->Set(prop, String::New((const char *)output->bufVal, output->bufLength));
+            delete[] output->bufVal;
             break;
           }
           case OutParam::OCCIBLOB: {
-            output->blobVal.open(oracle::occi::OCCI_LOB_READONLY);
-            int lobLength = output->blobVal.length();
-            oracle::occi::Stream* instream = output->blobVal.getStream(1, 0);
-            char *buffer = new char[lobLength];
-            memset(buffer, 0, lobLength);
-            instream->readBuffer(buffer, lobLength);
-            output->blobVal.closeStream(instream);
-            output->blobVal.close();
-
             // convert to V8 buffer
-            v8::Local<v8::Object> v8Buffer = NanBufferUse(buffer, lobLength);
+            v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)output->bufVal, output->bufLength);
             obj->Set(prop, v8Buffer);
-            delete[] buffer;
+            delete[] output->bufVal;
             break;
           }
           case OutParam::OCCIDATE:
@@ -964,12 +1005,12 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
   } catch (NodeOracleException &ex) {
     Handle<Value> argv[2];
     argv[0] = NanError(ex.getMessage().c_str());
-    argv[1] = Undefined();
+    argv[1] = NanUndefined();
     baton->callback->Call(2, argv);
   } catch (const std::exception &ex) {
     Handle<Value> argv[2];
     argv[0] = NanError(ex.what());
-    argv[1] = Undefined();
+    argv[1] = NanUndefined();
     baton->callback->Call(2, argv);
   }
 
@@ -994,7 +1035,8 @@ NAN_METHOD(Connection::ExecuteSync) {
 
   ExecuteBaton* baton;
   try {
-    baton = new ExecuteBaton(connection, *sqlVal, &values, NULL);
+    Local<Function> callback;
+    baton = new ExecuteBaton(connection, *sqlVal, &values, callback);
   } catch (NodeOracleException &ex) {
     return NanThrowError(ex.getMessage().c_str());
   }
@@ -1037,6 +1079,78 @@ oracle::occi::Statement* Connection::CreateStatement(ExecuteBaton* baton) {
   }
 }
 
+buffer_t* Connection::readClob(oracle::occi::Clob& clobVal, int charForm) {
+  clobVal.open(oracle::occi::OCCI_LOB_READONLY);
+  switch (charForm) {
+  case SQLCS_IMPLICIT:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_IMPLICIT);
+    break;
+  case SQLCS_NCHAR:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_NCHAR);
+    break;
+  case SQLCS_EXPLICIT:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_EXPLICIT);
+    break;
+  case SQLCS_FLEXIBLE:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_FLEXIBLE);
+    break;
+  }
+
+  unsigned int lobLength = clobVal.length();
+  unsigned char* lob = new unsigned char[lobLength];
+  unsigned int totalBytesRead = 0;
+  oracle::occi::Stream* instream = clobVal.getStream(1, 0);
+  // chunk size is set when the table is created
+  size_t chunkSize = clobVal.getChunkSize();
+  char* buffer = new char[chunkSize];
+  memset(buffer, 0, chunkSize);
+  int numBytesRead = 0;
+  while (numBytesRead != -1) {
+    numBytesRead = instream->readBuffer(buffer, chunkSize);
+    if (numBytesRead > 0) {
+      memcpy(lob + totalBytesRead, buffer, numBytesRead);
+      totalBytesRead += numBytesRead;
+    }
+  }
+  clobVal.closeStream(instream);
+  clobVal.close();
+  delete[] buffer;
+
+  buffer_t* b = new buffer_t();
+  b->data = lob;
+  b->length = totalBytesRead;
+
+  return b;
+}
+
+buffer_t* Connection::readBlob(oracle::occi::Blob& blobVal) {
+  blobVal.open(oracle::occi::OCCI_LOB_READONLY);
+  unsigned int lobLength = blobVal.length();
+  unsigned char* lob = new unsigned char[lobLength];
+  unsigned int totalBytesRead = 0;
+  oracle::occi::Stream* instream = blobVal.getStream(1, 0);
+  // chunk size is set when the table is created
+  size_t chunkSize = blobVal.getChunkSize();
+  char* buffer = new char[chunkSize];
+  memset(buffer, 0, chunkSize);
+  int numBytesRead = 0;
+  while (numBytesRead != -1) {
+    numBytesRead = instream->readBuffer(buffer, chunkSize);
+    if (numBytesRead > 0) {
+      memcpy(lob + totalBytesRead, buffer, numBytesRead);
+      totalBytesRead += numBytesRead;
+    }
+  }
+  blobVal.closeStream(instream);
+  blobVal.close();
+  delete[] buffer;
+
+  buffer_t* b = new buffer_t();
+  b->data = lob;
+  b->length = totalBytesRead;
+  return b;
+}
+
 void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* stmt) {
   oracle::occi::ResultSet* rs = NULL;
 
@@ -1077,11 +1191,21 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
                 output->rows->push_back(row);
               }
               break;
-            case OutParam::OCCICLOB:
+            case OutParam::OCCICLOB: {
               output->clobVal = stmt->getClob(output->index);
+              buffer_t *buf = Connection::readClob(output->clobVal);
+              output->bufVal = buf->data;
+              output->bufLength = buf->length;
+              delete buf;
+              }
               break;
-            case OutParam::OCCIBLOB:
+            case OutParam::OCCIBLOB: {
               output->blobVal = stmt->getBlob(output->index);
+              buffer_t *buf = Connection::readBlob(output->blobVal);
+              output->bufVal = buf->data;
+              output->bufLength = buf->length;
+              delete buf;
+              }
               break;
             case OutParam::OCCIDATE:
               output->dateVal = stmt->getDate(output->index);

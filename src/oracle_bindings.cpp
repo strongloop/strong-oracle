@@ -135,9 +135,9 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
   Handle<Value> argv[2];
   if(baton->error) {
     argv[0] = Exception::Error(String::New(baton->error->c_str()));
-    argv[1] = Undefined();
+    argv[1] = NanUndefined();
   } else {
-    argv[0] = Undefined();
+    argv[0] = NanUndefined();
     Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->client->m_environment, NULL, baton->connection);
@@ -145,12 +145,14 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
   }
 
   v8::TryCatch tryCatch;
+
   baton->callback->Call(2, argv);
+  delete req;
+  delete baton;
+
   if (tryCatch.HasCaught()) {
     node::FatalException(tryCatch);
   }
-
-  delete baton;
 }
 
 NAN_METHOD(OracleClient::ConnectSync) {
@@ -318,9 +320,9 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
   Handle<Value> argv[2];
   if(baton->error) {
     argv[0] = Exception::Error(String::New(baton->error->c_str()));
-    argv[1] = Undefined();
+    argv[1] = NanUndefined();
   } else {
-    argv[0] = Undefined();
+    argv[0] = NanUndefined();
     Local<FunctionTemplate> ft = NanNew(ConnectionPool::s_ct);
     Handle<Object> connectionPool = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(baton->client->m_environment, baton->connectionPool);
@@ -328,12 +330,14 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
   }
 
   v8::TryCatch tryCatch;
+
   baton->callback->Call(2, argv);
+  delete req;
+  delete baton;
+
   if (tryCatch.HasCaught()) {
     node::FatalException(tryCatch);
   }
-
-  delete baton;
 }
 
 extern "C" {

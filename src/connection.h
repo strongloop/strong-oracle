@@ -42,6 +42,11 @@ public:
   static void EIO_Rollback(uv_work_t* req);
   static void EIO_AfterRollback(uv_work_t* req, int status);
 
+  // asynchronous rollback method
+  static NAN_METHOD(Close);
+  static void EIO_Close(uv_work_t* req);
+  static void EIO_AfterClose(uv_work_t* req, int status);
+
   static NAN_METHOD(Prepare);
   static NAN_METHOD(CreateReader);
 
@@ -49,7 +54,7 @@ public:
   static NAN_METHOD(SetPrefetchRowCount);
   static NAN_METHOD(IsConnected);
 
-  static NAN_METHOD(Close);
+  static NAN_METHOD(CloseSync);
 
   void closeConnection();
 
@@ -121,6 +126,10 @@ private:
 
   // Prefetch row count
   int m_prefetchRowCount;
+
+  static void EIO_AfterCall(uv_work_t* req, int status);
+  static buffer_t* readClob(oracle::occi::Clob& clobVal, int charForm = SQLCS_IMPLICIT);
+  static buffer_t* readBlob(oracle::occi::Blob& blobVal);
 };
 
 /**
@@ -133,11 +142,15 @@ public:
   static void Init(Handle<Object> target);
   static NAN_METHOD(New);
   static NAN_METHOD(GetInfo);
-  static NAN_METHOD(Close);
+  static NAN_METHOD(CloseSync);
 
   static NAN_METHOD(GetConnection);
   static void EIO_GetConnection(uv_work_t* req);
   static void EIO_AfterGetConnection(uv_work_t* req, int status);
+
+  static NAN_METHOD(Close);
+  static void EIO_Close(uv_work_t* req);
+  static void EIO_AfterClose(uv_work_t* req, int status);
 
   static NAN_METHOD(GetConnectionSync);
 
@@ -168,15 +181,23 @@ private:
 class ConnectionPoolBaton {
 public:
   ConnectionPoolBaton(oracle::occi::Environment* environment,
-      ConnectionPool* connectionPool, const v8::Handle<v8::Function>& callback) {
+      ConnectionPool* connectionPool,
+      oracle::occi::StatelessConnectionPool::DestroyMode destroyMode,
+      const v8::Handle<v8::Function>& callback) {
     this->environment = environment;
     this->connectionPool = connectionPool;
-    this->callback = new NanCallback(callback);
+    if (callback->IsUndefined()) {
+      this->callback = NULL;
+    } else {
+      this->callback = new NanCallback(callback);
+    }
     this->connection = NULL;
     this->error = NULL;
+    this->destroyMode = destroyMode;
   }
 
   ~ConnectionPoolBaton() {
+    delete error;
     delete callback;
   }
 
@@ -184,9 +205,29 @@ public:
   ConnectionPool *connectionPool;
   oracle::occi::Connection* connection;
   NanCallback *callback;
+  std::string *error;
+  oracle::occi::StatelessConnectionPool::DestroyMode destroyMode;
+};
 
-  std::string* error;
+class ConnectionBaton {
+public:
+  ConnectionBaton(Connection* connection, const v8::Handle<v8::Function>& callback) {
+    this->connection = connection;
+    if (callback.IsEmpty() || callback->IsUndefined()) {
+      this->callback = NULL;
+    } else {
+      this->callback = new NanCallback(callback);
+    }
+    this->error = NULL;
+  }
+  ~ConnectionBaton() {
+    delete error;
+    delete callback;
+  }
 
+  Connection *connection;
+  NanCallback *callback;
+  std::string *error;
 };
 
 #endif
