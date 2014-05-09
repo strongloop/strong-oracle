@@ -70,7 +70,7 @@ public:
    */
   static NAN_METHOD(CreateConnectionPoolSync);
 
-  OracleClient(oracle::occi::Environment::Mode mode = oracle::occi::Environment::THREADED_MUTEXED);
+  explicit OracleClient(oracle::occi::Environment::Mode mode = oracle::occi::Environment::THREADED_MUTEXED);
   ~OracleClient();
 
   oracle::occi::Environment* getEnvironment() {
