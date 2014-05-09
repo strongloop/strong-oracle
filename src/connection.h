@@ -128,7 +128,7 @@ private:
   int m_prefetchRowCount;
 
   static void EIO_AfterCall(uv_work_t* req, int status);
-  static buffer_t* readClob(oracle::occi::Clob& clobVal);
+  static buffer_t* readClob(oracle::occi::Clob& clobVal, int charForm = SQLCS_IMPLICIT);
   static buffer_t* readBlob(oracle::occi::Blob& blobVal);
 };
 

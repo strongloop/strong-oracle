@@ -661,7 +661,7 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
         break;
       case VALUE_TYPE_CLOB: {
         oracle::occi::Clob clob = rs->getClob(colIndex);
-        row->values.push_back(Connection::readClob(clob));
+        row->values.push_back(Connection::readClob(clob, col->charForm));
         }
         break;
       case VALUE_TYPE_BLOB: {
@@ -1079,8 +1079,23 @@ oracle::occi::Statement* Connection::CreateStatement(ExecuteBaton* baton) {
   }
 }
 
-buffer_t* Connection::readClob(oracle::occi::Clob& clobVal) {
+buffer_t* Connection::readClob(oracle::occi::Clob& clobVal, int charForm) {
   clobVal.open(oracle::occi::OCCI_LOB_READONLY);
+  switch (charForm) {
+  case SQLCS_IMPLICIT:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_IMPLICIT);
+    break;
+  case SQLCS_NCHAR:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_NCHAR);
+    break;
+  case SQLCS_EXPLICIT:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_EXPLICIT);
+    break;
+  case SQLCS_FLEXIBLE:
+    clobVal.setCharSetForm(oracle::occi::OCCI_SQLCS_FLEXIBLE);
+    break;
+  }
+
   unsigned int lobLength = clobVal.length();
   unsigned char* lob = new unsigned char[lobLength];
   unsigned int totalBytesRead = 0;
