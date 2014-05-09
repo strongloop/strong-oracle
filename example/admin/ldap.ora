@@ -1,0 +1,4 @@
+DIRECTORY_SERVERS=(localhost:1389) 
+DEFAULT_ADMIN_CONTEXT="dc=strongloop,dc=com" 
+DIRECTORY_SERVER_TYPE=OID 
+

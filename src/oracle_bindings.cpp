@@ -43,8 +43,8 @@ ConnectBaton::~ConnectBaton() {
 }
 
 // OracleClient implementation
-OracleClient::OracleClient() {
-  m_environment = oracle::occi::Environment::createEnvironment(oracle::occi::Environment::THREADED_MUTEXED);
+OracleClient::OracleClient(oracle::occi::Environment::Mode mode) {
+  m_environment = oracle::occi::Environment::createEnvironment(mode);
 }
 
 OracleClient::~OracleClient() {
@@ -70,8 +70,27 @@ void OracleClient::Init(Handle<Object> target) {
 NAN_METHOD(OracleClient::New) {
   NanScope();
 
-  OracleClient *client = new OracleClient();
+  OracleClient *client = NULL;
+  if(args.Length() == 0) {
+    client = new OracleClient();
+  } else {
+    client = new OracleClient(oracle::occi::Environment::USE_LDAP);
+  }
   client->Wrap(args.This());
+  if(args.Length() > 0) {
+    REQ_OBJECT_ARG(0, ldap);
+    std::string adminContext, host, user, password;
+    int port;
+    OBJ_GET_STRING(ldap, "adminContext", adminContext);
+    OBJ_GET_STRING(ldap, "host", host);
+    OBJ_GET_NUMBER(ldap, "port", port, 389);
+    OBJ_GET_STRING(ldap, "user", user);
+    OBJ_GET_STRING(ldap, "password", password);
+    client->getEnvironment()->setLDAPAdminContext(adminContext);
+    client->getEnvironment()->setLDAPAuthentication(0x1);
+    client->getEnvironment()->setLDAPHostAndPort(host, port);
+    client->getEnvironment()->setLDAPLoginNameAndPassword(user, password);
+  }
   NanReturnValue(args.This());
 }
 
@@ -284,7 +303,10 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
 
   try {
     char connectionStr[512];
-    if (baton->tns != "") {
+    if (baton->environment->getLDAPHost() != "") {
+      // http://docs.oracle.com/cd/E16655_01/network.121/e17610/config_concepts.htm#NETAG1054
+      snprintf(connectionStr, sizeof(connectionStr), "%s", baton->database.c_str());
+    } else if (baton->tns != "") {
       snprintf(connectionStr, sizeof(connectionStr), "%s", baton->tns.c_str());
     } else {
       snprintf(connectionStr, sizeof(connectionStr), "//%s:%d/%s", baton->hostname.c_str(), baton->port, baton->database.c_str());
