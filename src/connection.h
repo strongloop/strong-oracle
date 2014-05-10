@@ -186,7 +186,7 @@ public:
       const v8::Handle<v8::Function>& callback) {
     this->environment = environment;
     this->connectionPool = connectionPool;
-    if (callback->IsUndefined()) {
+    if (callback.IsEmpty() || callback->IsUndefined()) {
       this->callback = NULL;
     } else {
       this->callback = new NanCallback(callback);

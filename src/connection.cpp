@@ -30,7 +30,7 @@ ConnectionPool::~ConnectionPool() {
 void ConnectionPool::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(ConnectionPool::New);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(ConnectionPool::New);
   NanAssignPersistent(ConnectionPool::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
@@ -94,7 +94,7 @@ NAN_METHOD(ConnectionPool::Close) {
         static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(args[0]->Uint32Value());
   }
 
-  Local<Function> callback = Local<Function>::Cast(Local<Value>::New(NanUndefined()));
+  Local<Function> callback;
   if (args.Length() == 1 && args[0]->IsFunction()) {
     callback = Local<Function>::Cast(args[0]);
   } else if(args.Length() > 1 && args[1]->IsFunction()) {
@@ -156,25 +156,25 @@ NAN_METHOD(ConnectionPool::GetInfo) {
   ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
       args.This());
   if (connectionPool->m_connectionPool) {
-    Local<Object> obj = Object::New();
+    Local<Object> obj = NanNew<Object>();
 
     obj->Set(NanSymbol("openConnections"),
-        Uint32::New(connectionPool->m_connectionPool->getOpenConnections()));
+        NanNew<Uint32>(connectionPool->m_connectionPool->getOpenConnections()));
     obj->Set(NanSymbol("busyConnections"),
-        Uint32::New(connectionPool->m_connectionPool->getBusyConnections()));
+        NanNew<Uint32>(connectionPool->m_connectionPool->getBusyConnections()));
     obj->Set(NanSymbol("maxConnections"),
-        Uint32::New(connectionPool->m_connectionPool->getMaxConnections()));
+        NanNew<Uint32>(connectionPool->m_connectionPool->getMaxConnections()));
     obj->Set(NanSymbol("minConnections"),
-        Uint32::New(connectionPool->m_connectionPool->getMinConnections()));
+        NanNew<Uint32>(connectionPool->m_connectionPool->getMinConnections()));
     obj->Set(NanSymbol("incrConnections"),
-        Uint32::New(connectionPool->m_connectionPool->getIncrConnections()));
+        NanNew<Uint32>(connectionPool->m_connectionPool->getIncrConnections()));
     obj->Set(NanSymbol("busyOption"),
-        Uint32::New(connectionPool->m_connectionPool->getBusyOption()));
+        NanNew<Uint32>(static_cast<unsigned int>(connectionPool->m_connectionPool->getBusyOption())));
     obj->Set(NanSymbol("timeout"),
-        Uint32::New(connectionPool->m_connectionPool->getTimeOut()));
+        NanNew<Uint32>(connectionPool->m_connectionPool->getTimeOut()));
 
     obj->Set(NanSymbol("poolName"),
-        String::New(connectionPool->m_connectionPool->getPoolName().c_str()));
+        NanNew<String>(connectionPool->m_connectionPool->getPoolName().c_str()));
 
     NanReturnValue(obj);
   } else {
@@ -283,7 +283,7 @@ void ConnectionPool::closeConnectionPool(
 void Connection::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(Connection::New);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(Connection::New);
   NanAssignPersistent(Connection::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
@@ -404,9 +404,9 @@ NAN_METHOD(Connection::IsConnected) {
   Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
 
   if (connection && connection->m_connection) {
-    NanReturnValue(Boolean::New(true));
+    NanReturnValue(NanNew<Boolean>(true));
   } else {
-    NanReturnValue(Boolean::New(false));
+    NanReturnValue(NanNew<Boolean>(false));
   }
 }
 
@@ -778,8 +778,8 @@ void Connection::EIO_Execute(uv_work_t* req) {
 
 void CallDateMethod(v8::Local<v8::Date> date, const char* methodName, int val) {
   Handle<Value> args[1];
-  args[0] = Number::New(val);
-  Local<Function>::Cast(date->Get(String::New(methodName)))->Call(date, 1,
+  args[0] = NanNew<Number>(val);
+  Local<Function>::Cast(date->Get(NanNew<String>(methodName)))->Call(date, 1,
       args);
 }
 
@@ -787,7 +787,7 @@ Local<Date> OracleDateToV8Date(oracle::occi::Date* d) {
   int year;
   unsigned int month, day, hour, min, sec;
   d->getDate(year, month, day, hour, min, sec);
-  Local<Date> date = Date::New(0.0).As<Date>();
+  Local<Date> date = NanNew<Date>(0.0).As<Date>();
   CallDateMethod(date, "setUTCMilliseconds", 0);
   CallDateMethod(date, "setUTCSeconds", sec);
   CallDateMethod(date, "setUTCMinutes", min);
@@ -803,7 +803,7 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
   unsigned int month, day, hour, min, sec, fs, ms;
   d->getDate(year, month, day);
   d->getTime(hour, min, sec, fs);
-  Local<Date> date = Date::New(0.0).As<Date>();
+  Local<Date> date = NanNew<Date>(0.0).As<Date>();
   //occi always returns nanoseconds, regardless of precision set on timestamp column
   ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
 
@@ -819,43 +819,43 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
 
 Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
     row_t* currentRow) {
-  Local<Object> obj = Object::New();
+  Local<Object> obj = NanNew<Object>();
   uint32_t colIndex = 0;
   for (vector<column_t*>::iterator iterator = columns.begin(), end =
       columns.end(); iterator != end; ++iterator, colIndex++) {
     column_t* col = *iterator;
     void* val = currentRow->values[colIndex];
     if (val == NULL) {
-      obj->Set(String::New(col->name.c_str()), Null());
+      obj->Set(NanNew<String>(col->name.c_str()), NanNull());
     } else {
       switch (col->type) {
       case VALUE_TYPE_STRING: {
         string* v = (string*) val;
-        obj->Set(String::New(col->name.c_str()), String::New(v->c_str()));
+        obj->Set(NanNew<String>(col->name.c_str()), NanNew<String>(v->c_str()));
         delete v;
       }
         break;
       case VALUE_TYPE_NUMBER: {
         oracle::occi::Number* v = (oracle::occi::Number*) val;
-        obj->Set(String::New(col->name.c_str()), Number::New((double) (*v)));
+        obj->Set(NanNew<String>(col->name.c_str()), NanNew<Number>((double) (*v)));
         delete v;
       }
         break;
       case VALUE_TYPE_DATE: {
         oracle::occi::Date* v = (oracle::occi::Date*) val;
-        obj->Set(String::New(col->name.c_str()), OracleDateToV8Date(v));
+        obj->Set(NanNew<String>(col->name.c_str()), OracleDateToV8Date(v));
         delete v;
       }
         break;
       case VALUE_TYPE_TIMESTAMP: {
         oracle::occi::Timestamp* v = (oracle::occi::Timestamp*) val;
-        obj->Set(String::New(col->name.c_str()), OracleTimestampToV8Date(v));
+        obj->Set(NanNew<String>(col->name.c_str()), OracleTimestampToV8Date(v));
         delete v;
       }
         break;
       case VALUE_TYPE_CLOB: {
         buffer_t *v = (buffer_t *) val;
-        obj->Set(String::New(col->name.c_str()), String::New((const char*)v->data, v->length));
+        obj->Set(NanNew<String>(col->name.c_str()), NanNew<String>((const char*)v->data, v->length));
         delete[] v->data;
         delete v;
       }
@@ -864,7 +864,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
         buffer_t *v = (buffer_t *) val;
         // convert to V8 buffer
         v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)v->data, v->length);
-        obj->Set(String::New(col->name.c_str()), v8Buffer);
+        obj->Set(NanNew<String>(col->name.c_str()), v8Buffer);
         delete[] v->data;
         delete v;
         break;
@@ -886,7 +886,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
 Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns,
     vector<row_t*>* rows) {
   size_t totalRows = rows->size();
-  Local<Array> retRows = Array::New(totalRows);
+  Local<Array> retRows = NanNew<Array>(totalRows);
   uint32_t index = 0;
   for (vector<row_t*>::iterator iterator = rows->begin(), end = rows->end();
       iterator != end; ++iterator, index++) {
@@ -933,8 +933,8 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
       if (baton->rows) {
         argv[1] = CreateV8ArrayFromRows(baton->columns, baton->rows);
       } else {
-        Local<Object> obj = Object::New();
-        obj->Set(String::New("updateCount"), Integer::New(baton->updateCount));
+        Local<Object> obj = NanNew<Object>();
+        obj->Set(NanNew<String>("updateCount"), NanNew<Integer>(baton->updateCount));
 
         /* Note: attempt to keep backward compatability here: existing users of this library will have code that expects a single out param
          called 'returnParam'. For multiple out params, the first output will continue to be called 'returnParam' and subsequent outputs
@@ -951,26 +951,26 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             snprintf(msg, sizeof(msg), "returnParam");
           }
           std::string returnParam(msg);
-          Local<String> prop = String::New(returnParam.c_str());
+          Local<String> prop = NanNew<String>(returnParam.c_str());
           switch (output->type) {
           case OutParam::OCCIINT:
-            obj->Set(prop, Integer::New(output->intVal));
+            obj->Set(prop, NanNew<Integer>(output->intVal));
             break;
           case OutParam::OCCISTRING:
-            obj->Set(prop, String::New(output->strVal.c_str()));
+            obj->Set(prop, NanNew<String>(output->strVal.c_str()));
             break;
           case OutParam::OCCIDOUBLE:
-            obj->Set(prop, Number::New(output->doubleVal));
+            obj->Set(prop, NanNew<Number>(output->doubleVal));
             break;
           case OutParam::OCCIFLOAT:
-            obj->Set(prop, Number::New(output->floatVal));
+            obj->Set(prop, NanNew<Number>(output->floatVal));
             break;
           case OutParam::OCCICURSOR:
             obj->Set(prop,
                 CreateV8ArrayFromRows(output->columns, output->rows));
             break;
           case OutParam::OCCICLOB: {
-            obj->Set(prop, String::New((const char *)output->bufVal, output->bufLength));
+            obj->Set(prop, NanNew<String>((const char *)output->bufVal, output->bufLength));
             delete[] output->bufVal;
             break;
           }
@@ -988,7 +988,7 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             obj->Set(prop, OracleTimestampToV8Date(&output->timestampVal));
             break;
           case OutParam::OCCINUMBER:
-            obj->Set(prop, Number::New((double) output->numberVal));
+            obj->Set(prop, NanNew<Number>((double) output->numberVal));
             break;
           default:
             char msg[128];

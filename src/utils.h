@@ -79,7 +79,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define OBJ_GET_STRING(OBJ, KEY, VAR)                                                                \
   {                                                                                                  \
-    Local<Value> __val = OBJ->Get(String::New(KEY));                                                 \
+    Local<Value> __val = OBJ->Get(NanNew<String>(KEY));                                                 \
     if(__val->IsString()) {                                                                          \
       String::Utf8Value __utf8Val(__val);                                                            \
       VAR = *__utf8Val;                                                                              \
@@ -92,7 +92,7 @@ inline static int snprintf(char* buf, unsigned int len, const char* fmt, ...) {
  */
 #define OBJ_GET_NUMBER(OBJ, KEY, VAR, DEFAULT)                                                       \
   {                                                                                                  \
-    Local<Value> __val = OBJ->Get(String::New(KEY));                                                 \
+    Local<Value> __val = OBJ->Get(NanNew<String>(KEY));                                                 \
     if(__val->IsNumber()) {                                                                          \
       VAR = __val->ToNumber()->Value();                                                              \
     }                                                                                                \

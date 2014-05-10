@@ -54,7 +54,7 @@ OracleClient::~OracleClient() {
 void OracleClient::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
   NanAssignPersistent(OracleClient::s_ct, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(NanSymbol("OracleClient"));
@@ -153,7 +153,7 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
 
   Handle<Value> argv[2];
   if(baton->error) {
-    argv[0] = Exception::Error(String::New(baton->error->c_str()));
+    argv[0] = Exception::Error(NanNew<String>(baton->error->c_str()));
     argv[1] = NanUndefined();
   } else {
     argv[0] = NanUndefined();
@@ -341,7 +341,7 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
 
   Handle<Value> argv[2];
   if(baton->error) {
-    argv[0] = Exception::Error(String::New(baton->error->c_str()));
+    argv[0] = Exception::Error(NanNew<String>(baton->error->c_str()));
     argv[1] = NanUndefined();
   } else {
     argv[0] = NanUndefined();

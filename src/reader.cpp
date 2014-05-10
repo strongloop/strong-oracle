@@ -10,14 +10,14 @@ Persistent<FunctionTemplate> Reader::s_ct;
 void Reader::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
   NanAssignPersistent(Reader::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(String::NewSymbol("Reader"));
+  t->SetClassName(NanSymbol("Reader"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "nextRows", NextRows);
-  target->Set(String::NewSymbol("Reader"), t->GetFunction());
+  target->Set(NanSymbol("Reader"), t->GetFunction());
 }
 
 Reader::Reader(): ObjectWrap() {
@@ -47,7 +47,7 @@ NAN_METHOD(Reader::NextRows) {
   Reader* reader = ObjectWrap::Unwrap<Reader>(args.This());
   ReaderBaton* baton = reader->m_baton;
   if (baton->error) {
-    Local<String> message = String::New(baton->error->c_str());
+    Local<String> message = NanNew<String>(baton->error->c_str());
     return NanThrowError(message);
   }
   if (baton->busy) {

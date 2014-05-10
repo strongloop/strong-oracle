@@ -10,10 +10,10 @@ Persistent<FunctionTemplate> Statement::s_ct;
 void Statement::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
   NanAssignPersistent(Statement::s_ct, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(String::NewSymbol("Statement"));
+  t->SetClassName(NanSymbol("Statement"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
   target->Set(NanSymbol("Statement"), t->GetFunction());
@@ -53,7 +53,7 @@ NAN_METHOD(Statement::Execute) {
 
   ExecuteBaton::CopyValuesToBaton(baton, &values);
   if (baton->error) {
-    Local<String> message = String::New(baton->error->c_str());
+    Local<String> message = NanNew<String>(baton->error->c_str());
     return NanThrowError(message);
   }
 
