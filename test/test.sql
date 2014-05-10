@@ -115,3 +115,12 @@ END;
     z := z * z;
   end;
   /
+  create or replace PROCEDURE procDateTimeOutParam(
+    outParam1 OUT DATE,
+    outParam2 OUT TIMESTAMP)
+  IS
+  BEGIN
+    outParam1 := sysdate;
+    outParam2 :=CURRENT_TIMESTAMP;
+  END;
+/
