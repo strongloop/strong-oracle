@@ -235,6 +235,7 @@ public:
   Connection *connection;
   NanCallback *callback;
   std::string *error;
+  uv_work_t work_req;
 };
 
 #endif

@@ -416,17 +416,11 @@ NAN_METHOD(Connection::Commit) {
 
   REQ_FUN_ARG(0, callback);
 
-  ConnectionBaton* baton;
-  try {
-    baton = new ConnectionBaton(connection, callback);
-  } catch (NodeOracleException &ex) {
-    return NanThrowError(ex.getMessage().c_str());
-  }
-
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_Commit,
-      (uv_after_work_cb) EIO_AfterCommit);
+  ConnectionBaton* baton = new ConnectionBaton(connection, callback);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_Commit,
+                (uv_after_work_cb) EIO_AfterCommit);
 
   connection->Ref();
 
@@ -439,12 +433,11 @@ NAN_METHOD(Connection::Rollback) {
 
   REQ_FUN_ARG(0, callback);
 
-  ConnectionBaton* baton= new ConnectionBaton(connection, callback);
-
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_Rollback,
-      (uv_after_work_cb) EIO_AfterRollback);
+  ConnectionBaton* baton = new ConnectionBaton(connection, callback);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_Rollback,
+                (uv_after_work_cb) EIO_AfterRollback);
 
   connection->Ref();
   NanReturnUndefined();
@@ -684,7 +677,7 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
 
 void Connection::EIO_AfterCall(uv_work_t* req, int status) {
   NanScope();
-  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+  ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
 
   baton->connection->Unref();
 
@@ -700,7 +693,6 @@ void Connection::EIO_AfterCall(uv_work_t* req, int status) {
     v8::TryCatch tryCatch;
     baton->callback->Call(2, argv);
     delete baton;
-    delete req;
 
     if (tryCatch.HasCaught()) {
       node::FatalException(tryCatch);
@@ -709,7 +701,7 @@ void Connection::EIO_AfterCall(uv_work_t* req, int status) {
 }
 
 void Connection::EIO_Commit(uv_work_t* req) {
-  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+  ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
 
   baton->connection->m_connection->commit();
 }
@@ -719,7 +711,7 @@ void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
 }
 
 void Connection::EIO_Rollback(uv_work_t* req) {
-  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+  ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
 
   baton->connection->m_connection->rollback();
 }
@@ -737,10 +729,11 @@ NAN_METHOD(Connection::Close) {
     callback = Local<Function>::Cast(args[0]);
   }
 
-  uv_work_t* req = new uv_work_t();
-  req->data = new ConnectionBaton(connection, callback);
-  uv_queue_work(uv_default_loop(), req, Connection::EIO_Close,
-      (uv_after_work_cb) Connection::EIO_AfterClose);
+  ConnectionBaton* baton = new ConnectionBaton(connection, callback);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                Connection::EIO_Close,
+                (uv_after_work_cb) Connection::EIO_AfterClose);
 
   connection->Ref();
 
@@ -748,7 +741,7 @@ NAN_METHOD(Connection::Close) {
 }
 
 void Connection::EIO_Close(uv_work_t* req) {
-  ConnectionBaton* baton = static_cast<ConnectionBaton*>(req->data);
+  ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
   try {
     baton->connection->closeConnection();
   } catch(const exception &ex) {
