@@ -88,8 +88,9 @@ private:
  */
 class ConnectBaton {
 public:
-  ConnectBaton(OracleClient* client, oracle::occi::Environment* environment,
-      v8::Handle<v8::Function>* callback);
+  ConnectBaton(OracleClient* client,
+               oracle::occi::Environment* environment,
+               v8::Handle<v8::Function> callback = v8::Handle<v8::Function>());
   ~ConnectBaton();
 
   /**
@@ -100,7 +101,7 @@ public:
   /**
    * The callback function
    */
-  NanCallback *callback;
+  NanCallback callback;
 
   /**
    * host name or ip address for the DB server

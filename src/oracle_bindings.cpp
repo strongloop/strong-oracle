@@ -9,13 +9,11 @@
 Persistent<FunctionTemplate> OracleClient::s_ct;
 
 // ConnectBaton implementation
-ConnectBaton::ConnectBaton(OracleClient* client, oracle::occi::Environment* environment, v8::Handle<v8::Function>* callback) {
+ConnectBaton::ConnectBaton(OracleClient* client,
+                           oracle::occi::Environment* environment,
+                           v8::Handle<v8::Function> callback) :
+    callback(callback) {
   this->client = client;
-  if(callback != NULL) {
-    this->callback = new NanCallback(*callback);
-  } else {
-    this->callback = new NanCallback();
-  }
   this->environment = environment;
   this->error = NULL;
   this->connection = NULL;
@@ -36,7 +34,6 @@ ConnectBaton::ConnectBaton(OracleClient* client, oracle::occi::Environment* envi
 }
 
 ConnectBaton::~ConnectBaton() {
-  delete callback;
   if(error) {
     delete error;
   }
@@ -102,7 +99,7 @@ NAN_METHOD(OracleClient::Connect) {
   REQ_FUN_ARG(1, callback);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
-  ConnectBaton* baton = new ConnectBaton(client, client->m_environment, &callback);
+  ConnectBaton* baton = new ConnectBaton(client, client->m_environment, callback);
 
   OBJ_GET_STRING(settings, "hostname", baton->hostname);
   OBJ_GET_STRING(settings, "user", baton->user);
@@ -166,7 +163,7 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
 
   v8::TryCatch tryCatch;
 
-  baton->callback->Call(2, argv);
+  baton->callback.Call(2, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
@@ -180,7 +177,7 @@ NAN_METHOD(OracleClient::ConnectSync) {
   REQ_OBJECT_ARG(0, settings);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
-  ConnectBaton baton(client, client->m_environment, NULL);
+  ConnectBaton baton(client, client->m_environment);
 
   OBJ_GET_STRING(settings, "hostname", baton.hostname);
   OBJ_GET_STRING(settings, "user", baton.user);
@@ -268,7 +265,7 @@ NAN_METHOD(OracleClient::CreateConnectionPool) {
   REQ_FUN_ARG(1, callback);
 
   OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
-  ConnectBaton* baton = new ConnectBaton(client, client->m_environment, &callback);
+  ConnectBaton* baton = new ConnectBaton(client, client->m_environment, callback);
 
   uint32_t busyOption;
 
@@ -353,7 +350,7 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
 
   v8::TryCatch tryCatch;
 
-  baton->callback->Call(2, argv);
+  baton->callback.Call(2, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
