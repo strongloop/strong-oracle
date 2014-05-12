@@ -12,6 +12,13 @@
 #include "nodeOracleException.h"
 #include "executeBaton.h"
 
+#define OFFSET_OF(TypeName, Field)                                            \
+  (reinterpret_cast<uintptr_t>(&(reinterpret_cast<TypeName*>(8)->Field)) - 8)
+
+#define CONTAINER_OF(Pointer, TypeName, Field)                                \
+  reinterpret_cast<TypeName*>(                                                \
+      reinterpret_cast<uintptr_t>(Pointer) - OFFSET_OF(TypeName, Field))
+
 using namespace node;
 using namespace v8;
 

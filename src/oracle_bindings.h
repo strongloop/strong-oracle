@@ -168,6 +168,8 @@ public:
    * Error message
    */
   std::string* error;
+
+  uv_work_t work_req;
 };
 
 #endif

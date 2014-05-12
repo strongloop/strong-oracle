@@ -114,15 +114,16 @@ NAN_METHOD(OracleClient::Connect) {
 
   client->Ref();
 
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_Connect, (uv_after_work_cb)EIO_AfterConnect);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_Connect,
+                (uv_after_work_cb) EIO_AfterConnect);
 
   NanReturnUndefined();
 }
 
 void OracleClient::EIO_Connect(uv_work_t* req) {
-  ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
+  ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
 
   baton->error = NULL;
 
@@ -148,7 +149,7 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
 
 void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
   NanScope();
-  ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
+  ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
   baton->client->Unref();
 
   Handle<Value> argv[2];
@@ -166,7 +167,6 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
   v8::TryCatch tryCatch;
 
   baton->callback->Call(2, argv);
-  delete req;
   delete baton;
 
   if (tryCatch.HasCaught()) {
@@ -289,16 +289,16 @@ NAN_METHOD(OracleClient::CreateConnectionPool) {
 
   client->Ref();
 
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_CreateConnectionPool, (uv_after_work_cb)EIO_AfterCreateConnectionPool);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_CreateConnectionPool,
+                (uv_after_work_cb) EIO_AfterCreateConnectionPool);
 
   NanReturnUndefined();
 }
 
 void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
-  ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
-
+  ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
   baton->error = NULL;
 
   try {
@@ -336,7 +336,7 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
 
 void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
   NanScope();
-  ConnectBaton* baton = static_cast<ConnectBaton*>(req->data);
+  ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
   baton->client->Unref();
 
   Handle<Value> argv[2];
@@ -354,7 +354,6 @@ void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
   v8::TryCatch tryCatch;
 
   baton->callback->Call(2, argv);
-  delete req;
   delete baton;
 
   if (tryCatch.HasCaught()) {
