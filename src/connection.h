@@ -214,6 +214,7 @@ public:
   NanCallback *callback;
   std::string *error;
   oracle::occi::StatelessConnectionPool::DestroyMode destroyMode;
+  uv_work_t work_req;
 };
 
 class ConnectionBaton {

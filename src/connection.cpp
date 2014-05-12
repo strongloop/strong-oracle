@@ -101,24 +101,21 @@ NAN_METHOD(ConnectionPool::Close) {
     callback = Local<Function>::Cast(args[1]);
   }
 
-  ConnectionPoolBaton* baton;
-  try {
-    baton = new ConnectionPoolBaton(connectionPool->getEnvironment(),
-        connectionPool, mode, callback);
-  } catch (NodeOracleException &ex) {
-    return NanThrowError(ex.getMessage().c_str());
-  }
-
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, ConnectionPool::EIO_Close,
-      (uv_after_work_cb) ConnectionPool::EIO_AfterClose);
+  ConnectionPoolBaton* baton =
+      new ConnectionPoolBaton(connectionPool->getEnvironment(),
+                              connectionPool,
+                              mode,
+                              callback);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                ConnectionPool::EIO_Close,
+                (uv_after_work_cb) ConnectionPool::EIO_AfterClose);
 
   NanReturnUndefined();
 }
 
 void ConnectionPool::EIO_Close(uv_work_t* req) {
-  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
   try {
     baton->connectionPool->closeConnectionPool(baton->destroyMode);
   } catch(const exception &ex) {
@@ -129,7 +126,7 @@ void ConnectionPool::EIO_Close(uv_work_t* req) {
 
 void ConnectionPool::EIO_AfterClose(uv_work_t* req, int status) {
   NanScope();
-  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
 
   if(baton->callback != NULL) {
     Handle<Value> argv[2];
@@ -143,7 +140,6 @@ void ConnectionPool::EIO_AfterClose(uv_work_t* req, int status) {
     v8::TryCatch tryCatch;
     baton->callback->Call(2, argv);
     delete baton;
-    delete req;
 
     if (tryCatch.HasCaught()) {
       node::FatalException(tryCatch);
@@ -208,20 +204,15 @@ NAN_METHOD(ConnectionPool::GetConnection) {
 
   REQ_FUN_ARG(0, callback);
 
-  ConnectionPoolBaton* baton;
-  try {
-    baton = new ConnectionPoolBaton(connectionPool->getEnvironment(),
-        connectionPool,
-        oracle::occi::StatelessConnectionPool::DEFAULT,
-        callback);
-  } catch (NodeOracleException &ex) {
-    return NanThrowError(ex.getMessage().c_str());
-  }
-
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, ConnectionPool::EIO_GetConnection,
-      (uv_after_work_cb) ConnectionPool::EIO_AfterGetConnection);
+  ConnectionPoolBaton* baton =
+      new ConnectionPoolBaton(connectionPool->getEnvironment(),
+                              connectionPool,
+                              oracle::occi::StatelessConnectionPool::DEFAULT,
+                              callback);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                ConnectionPool::EIO_GetConnection,
+                (uv_after_work_cb) ConnectionPool::EIO_AfterGetConnection);
 
   connectionPool->Ref();
 
@@ -229,7 +220,7 @@ NAN_METHOD(ConnectionPool::GetConnection) {
 }
 
 void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
-  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
   baton->error = NULL;
   try {
     oracle::occi::Connection *conn =
@@ -243,7 +234,7 @@ void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
 
 void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
   NanScope();
-  ConnectionPoolBaton* baton = static_cast<ConnectionPoolBaton*>(req->data);
+  ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
 
   baton->connectionPool->Unref();
 
@@ -264,7 +255,6 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
   v8::TryCatch tryCatch;
   baton->callback->Call(2, argv);
   delete baton;
-  delete req;
 
   if (tryCatch.HasCaught()) {
     node::FatalException(tryCatch);
