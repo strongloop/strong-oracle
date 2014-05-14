@@ -109,8 +109,6 @@ NAN_METHOD(OracleClient::Connect) {
   OBJ_GET_STRING(settings, "tns", baton->tns);
   OBJ_GET_NUMBER(settings, "stmtCacheSize", baton->stmtCacheSize, 16);
 
-  client->Ref();
-
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
                 EIO_Connect,
@@ -147,7 +145,6 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
 void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
   NanScope();
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
-  baton->client->Unref();
 
   Handle<Value> argv[2];
   if(baton->error) {
@@ -284,8 +281,6 @@ NAN_METHOD(OracleClient::CreateConnectionPool) {
   OBJ_GET_NUMBER(settings, "stmtCacheSize", baton->stmtCacheSize, 16);
 
 
-  client->Ref();
-
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
                 EIO_CreateConnectionPool,
@@ -334,7 +329,6 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
 void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
   NanScope();
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
-  baton->client->Unref();
 
   Handle<Value> argv[2];
   if(baton->error) {

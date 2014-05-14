@@ -67,7 +67,6 @@ NAN_METHOD(Reader::NextRows) {
   }
   if (baton->count <= 0) baton->count = 1;
 
-  baton->connection->Ref();
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
                 EIO_NextRows,
@@ -120,7 +119,6 @@ void Reader::EIO_AfterNextRows(uv_work_t* req, int status) {
   ReaderBaton* baton = CONTAINER_OF(req, ReaderBaton, work_req);
 
   baton->busy = false;
-  baton->connection->Unref();
 
   Handle<Value> argv[2];
   Connection::handleResult(baton, argv);

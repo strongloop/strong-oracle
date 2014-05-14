@@ -214,8 +214,6 @@ NAN_METHOD(ConnectionPool::GetConnection) {
                 ConnectionPool::EIO_GetConnection,
                 (uv_after_work_cb) ConnectionPool::EIO_AfterGetConnection);
 
-  connectionPool->Ref();
-
   NanReturnUndefined();
 }
 
@@ -235,8 +233,6 @@ void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
 void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
   NanScope();
   ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
-
-  baton->connectionPool->Unref();
 
   Handle<Value> argv[2];
   if (baton->error) {
@@ -363,7 +359,6 @@ NAN_METHOD(Connection::Execute) {
   String::Utf8Value sqlVal(sql);
 
   ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values, callback);
-  connection->Ref();
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
                 EIO_Execute,
@@ -407,8 +402,6 @@ NAN_METHOD(Connection::Commit) {
                 EIO_Commit,
                 (uv_after_work_cb) EIO_AfterCommit);
 
-  connection->Ref();
-
   NanReturnUndefined();
 }
 
@@ -424,7 +417,6 @@ NAN_METHOD(Connection::Rollback) {
                 EIO_Rollback,
                 (uv_after_work_cb) EIO_AfterRollback);
 
-  connection->Ref();
   NanReturnUndefined();
 }
 
@@ -664,8 +656,6 @@ void Connection::EIO_AfterCall(uv_work_t* req, int status) {
   NanScope();
   ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
 
-  baton->connection->Unref();
-
   v8::TryCatch tryCatch;
   if (baton->callback != NULL) {
     Handle<Value> argv[2];
@@ -719,8 +709,6 @@ NAN_METHOD(Connection::Close) {
                 &baton->work_req,
                 Connection::EIO_Close,
                 (uv_after_work_cb) Connection::EIO_AfterClose);
-
-  connection->Ref();
 
   NanReturnUndefined();
 }
@@ -879,7 +867,6 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
   NanScope();
   ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
 
-  baton->connection->Unref();
   try {
     Handle<Value> argv[2];
     handleResult(baton, argv);
@@ -1010,9 +997,7 @@ NAN_METHOD(Connection::ExecuteSync) {
   String::Utf8Value sqlVal(sql);
 
   ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values);
-  baton->connection->Ref();
   EIO_Execute(&baton->work_req);
-  baton->connection->Unref();
   Handle<Value> argv[2];
   handleResult(baton, argv);
 

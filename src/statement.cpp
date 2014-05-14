@@ -62,7 +62,6 @@ NAN_METHOD(Statement::Execute) {
   }
   baton->busy = true;
 
-  baton->connection->Ref();
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
                 EIO_Execute,
@@ -90,7 +89,6 @@ void Statement::EIO_AfterExecute(uv_work_t* req, int status) {
   StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
   baton->busy = false;
-  baton->connection->Unref();
 
   Handle<Value> argv[2];
   Connection::handleResult(baton, argv);

@@ -22,6 +22,10 @@
 using namespace node;
 using namespace v8;
 
+class ConnectionBaton;
+class ConnectionPoolBaton;
+class ExecuteBaton;
+
 /**
  * Wrapper for an OCCI Connection class so that it can be used in JavaScript
  */
@@ -67,14 +71,6 @@ public:
 
   Connection();
   ~Connection();
-
-  // Make Ref and Unref public so that ExecuteBaton can call them
-  void Ref() {
-    ObjectWrap::Ref();
-  }
-  void Unref() {
-    ObjectWrap::Unref();
-  }
 
   void setConnection(oracle::occi::Environment* environment,
       oracle::occi::StatelessConnectionPool* connectionPool,
@@ -137,6 +133,9 @@ private:
   static void EIO_AfterCall(uv_work_t* req, int status);
   static buffer_t* readClob(oracle::occi::Clob& clobVal, int charForm = SQLCS_IMPLICIT);
   static buffer_t* readBlob(oracle::occi::Blob& blobVal);
+
+  friend class ConnectionBaton;
+  friend class ExecuteBaton;
 };
 
 /**
@@ -180,6 +179,8 @@ public:
 private:
   oracle::occi::Environment* m_environment;
   oracle::occi::StatelessConnectionPool* m_connectionPool;
+
+  friend class ConnectionPoolBaton;
 };
 
 /**
@@ -193,6 +194,7 @@ public:
       const v8::Handle<v8::Function>& callback) {
     this->environment = environment;
     this->connectionPool = connectionPool;
+    this->connectionPool->Ref();
     if (callback.IsEmpty() || callback->IsUndefined()) {
       this->callback = NULL;
     } else {
@@ -206,6 +208,7 @@ public:
   ~ConnectionPoolBaton() {
     delete error;
     delete callback;
+    this->connectionPool->Unref();
   }
 
   oracle::occi::Environment* environment;
@@ -221,6 +224,7 @@ class ConnectionBaton {
 public:
   ConnectionBaton(Connection* connection, const v8::Handle<v8::Function>& callback) {
     this->connection = connection;
+    this->connection->Ref();
     if (callback.IsEmpty() || callback->IsUndefined()) {
       this->callback = NULL;
     } else {
@@ -231,6 +235,7 @@ public:
   ~ConnectionBaton() {
     delete error;
     delete callback;
+    this->connection->Unref();
   }
 
   Connection *connection;
