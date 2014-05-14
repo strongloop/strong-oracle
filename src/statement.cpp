@@ -62,16 +62,17 @@ NAN_METHOD(Statement::Execute) {
   }
   baton->busy = true;
 
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_Execute, (uv_after_work_cb)EIO_AfterExecute);
   baton->connection->Ref();
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_Execute,
+                (uv_after_work_cb) EIO_AfterExecute);
 
   NanReturnUndefined();
 }
 
 void Statement::EIO_Execute(uv_work_t* req) {
-  StatementBaton* baton = static_cast<StatementBaton*>(req->data);
+  StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
   if (!baton->connection->getConnection()) {
     baton->error = new std::string("Connection already closed");
@@ -86,7 +87,7 @@ void Statement::EIO_Execute(uv_work_t* req) {
 
 void Statement::EIO_AfterExecute(uv_work_t* req, int status) {
   NanScope();
-  StatementBaton* baton = static_cast<StatementBaton*>(req->data);
+  StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
   baton->busy = false;
   baton->connection->Unref();
@@ -98,7 +99,6 @@ void Statement::EIO_AfterExecute(uv_work_t* req, int status) {
   baton->ResetRows();
   baton->ResetOutputs();
   baton->ResetError();
-  delete req;
 
   // invoke callback at the very end because callback may re-enter execute.
   baton->callback->Call(2, argv);
