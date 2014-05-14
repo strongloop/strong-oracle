@@ -128,7 +128,8 @@ void ConnectionPool::EIO_AfterClose(uv_work_t* req, int status) {
   NanScope();
   ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
 
-  if(baton->callback != NULL) {
+  v8::TryCatch tryCatch;
+  if (baton->callback != NULL) {
     Handle<Value> argv[2];
     if (baton->error) {
       argv[0] = NanError(baton->error->c_str());
@@ -137,13 +138,12 @@ void ConnectionPool::EIO_AfterClose(uv_work_t* req, int status) {
       argv[0] = NanUndefined();
       argv[1] = NanUndefined();
     }
-    v8::TryCatch tryCatch;
     baton->callback->Call(2, argv);
-    delete baton;
+  }
+  delete baton;
 
-    if (tryCatch.HasCaught()) {
-      node::FatalException(tryCatch);
-    }
+  if (tryCatch.HasCaught()) {
+    node::FatalException(tryCatch);
   }
 }
 
@@ -666,7 +666,8 @@ void Connection::EIO_AfterCall(uv_work_t* req, int status) {
 
   baton->connection->Unref();
 
-  if(baton->callback != NULL) {
+  v8::TryCatch tryCatch;
+  if (baton->callback != NULL) {
     Handle<Value> argv[2];
     if (baton->error) {
       argv[0] = NanError(baton->error->c_str());
@@ -675,13 +676,12 @@ void Connection::EIO_AfterCall(uv_work_t* req, int status) {
       argv[0] = NanUndefined();
       argv[1] = NanUndefined();
     }
-    v8::TryCatch tryCatch;
     baton->callback->Call(2, argv);
-    delete baton;
+  }
+  delete baton;
 
-    if (tryCatch.HasCaught()) {
-      node::FatalException(tryCatch);
-    }
+  if (tryCatch.HasCaught()) {
+    node::FatalException(tryCatch);
   }
 }
 
