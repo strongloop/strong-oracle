@@ -51,7 +51,7 @@ NAN_METHOD(Statement::Execute) {
 
   baton->callback = new NanCallback(callback);
 
-  ExecuteBaton::CopyValuesToBaton(baton, &values);
+  ExecuteBaton::CopyValuesToBaton(baton, values);
   if (baton->error) {
     Local<String> message = NanNew<String>(baton->error->c_str());
     return NanThrowError(message);

@@ -310,7 +310,7 @@ NAN_METHOD(Connection::Prepare) {
 
   String::Utf8Value sqlVal(sql);
 
-  StatementBaton* baton = new StatementBaton(connection, *sqlVal, NULL);
+  StatementBaton* baton = new StatementBaton(connection, *sqlVal);
   Local<FunctionTemplate> ft = NanNew(Statement::s_ct);
   Handle<Object> statementHandle = ft->GetFunction()->NewInstance();
   Statement* statement = ObjectWrap::Unwrap<Statement>(statementHandle);
@@ -328,7 +328,7 @@ NAN_METHOD(Connection::CreateReader) {
 
   String::Utf8Value sqlVal(sql);
 
-  ReaderBaton* baton = new ReaderBaton(connection, *sqlVal, &values);
+  ReaderBaton* baton = new ReaderBaton(connection, *sqlVal, values);
 
   Local<FunctionTemplate> ft = NanNew(Reader::s_ct);
   Local<Object> readerHandle = ft->GetFunction()->NewInstance();
@@ -362,7 +362,7 @@ NAN_METHOD(Connection::Execute) {
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values, callback);
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values, callback);
   connection->Ref();
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
@@ -1009,7 +1009,7 @@ NAN_METHOD(Connection::ExecuteSync) {
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values);
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values);
   baton->connection->Ref();
   EIO_Execute(&baton->work_req);
   baton->connection->Unref();

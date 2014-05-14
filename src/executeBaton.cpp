@@ -8,7 +8,7 @@ using namespace std;
 
 ExecuteBaton::ExecuteBaton(Connection* connection,
                            const char* sql,
-                           v8::Local<v8::Array>* values,
+                           v8::Local<v8::Array> values,
                            v8::Local<v8::Function> callback) {
   this->connection = connection;
   this->sql = sql;
@@ -58,14 +58,11 @@ oracle::occi::Timestamp* V8DateToOcciDate(oracle::occi::Environment* env,
 }
 
 void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
-    v8::Local<v8::Array>* values) {
+                                     v8::Local<v8::Array> values) {
+  if (values.IsEmpty()) return;
 
-  if (values == NULL) {
-    return;
-  }
-
-  for (uint32_t i = 0; i < (*values)->Length(); i++) {
-    v8::Local<Value> val = (*values)->Get(i);
+  for (uint32_t i = 0; i < values->Length(); i++) {
+    v8::Local<Value> val = values->Get(i);
     value_t *value = new value_t();
 
     // null
