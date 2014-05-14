@@ -1,0 +1,26 @@
+# For shame, Oracle, for shame...
+{
+  oracle
+  Memcheck:Cond
+  obj:*/libclntsh.so.12.1
+}
+{
+  oracle
+  Memcheck:Addr16
+  obj:*/libclntsh.so.12.1
+}
+{
+  oracle
+  Memcheck:Addr16
+  obj:*/libclntshcore.so.12.1
+}
+{
+  oracle
+  Memcheck:Cond
+  obj:*/libnnz12.so
+}
+{
+  oracle
+  Memcheck:Value8
+  obj:*/libnnz12.so
+}
