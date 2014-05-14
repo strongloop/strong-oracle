@@ -71,11 +71,10 @@ struct output_t {
  */
 class ExecuteBaton {
 public:
-  ExecuteBaton(Connection* connection, const char* sql,
-      v8::Local<v8::Array>* values, v8::Handle<v8::Function>& callback);
-
-  ExecuteBaton(Connection* connection, const char* sql,
-      v8::Local<v8::Array>* values);
+  ExecuteBaton(Connection* connection,
+               const char* sql,
+               v8::Local<v8::Array>* values,
+               v8::Local<v8::Function> callback = v8::Local<v8::Function>());
 
   ~ExecuteBaton();
 
@@ -97,10 +96,6 @@ public:
 
   static void CopyValuesToBaton(ExecuteBaton* baton,
       v8::Local<v8::Array>* values);
-
-private:
-  void init(Connection* connection, const char* sql,
-      v8::Local<v8::Array>* values, NanCallback *cb);
 };
 
 #endif

@@ -1009,9 +1009,7 @@ NAN_METHOD(Connection::ExecuteSync) {
 
   String::Utf8Value sqlVal(sql);
 
-  Local<Function> callback;
-  ExecuteBaton* baton =
-      new ExecuteBaton(connection, *sqlVal, &values, callback);
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values);
   baton->connection->Ref();
   EIO_Execute(&baton->work_req);
   baton->connection->Unref();
