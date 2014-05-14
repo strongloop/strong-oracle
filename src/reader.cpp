@@ -67,16 +67,17 @@ NAN_METHOD(Reader::NextRows) {
   }
   if (baton->count <= 0) baton->count = 1;
 
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_NextRows, (uv_after_work_cb)EIO_AfterNextRows);
   baton->connection->Ref();
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_NextRows,
+                (uv_after_work_cb) EIO_AfterNextRows);
 
   NanReturnUndefined();
 }
 
 void Reader::EIO_NextRows(uv_work_t* req) {
-  ReaderBaton* baton = static_cast<ReaderBaton*>(req->data);
+  ReaderBaton* baton = CONTAINER_OF(req, ReaderBaton, work_req);
 
   baton->rows = new vector<row_t*>();
   if (baton->done) return;
@@ -116,7 +117,7 @@ void Reader::EIO_NextRows(uv_work_t* req) {
 
 void Reader::EIO_AfterNextRows(uv_work_t* req, int status) {
   NanScope();
-  ReaderBaton* baton = static_cast<ReaderBaton*>(req->data);
+  ReaderBaton* baton = CONTAINER_OF(req, ReaderBaton, work_req);
 
   baton->busy = false;
   baton->connection->Unref();
@@ -130,9 +131,7 @@ void Reader::EIO_AfterNextRows(uv_work_t* req, int status) {
     // reader destructor will delete the baton and everything else.
     baton->ResetStatement();
   }
-  delete req;
 
   // invoke callback at the very end because callback may re-enter nextRows.
   baton->callback->Call(2, argv);
 }
-
