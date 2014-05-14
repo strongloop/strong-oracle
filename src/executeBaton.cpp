@@ -11,6 +11,7 @@ ExecuteBaton::ExecuteBaton(Connection* connection,
                            v8::Local<v8::Array> values,
                            v8::Local<v8::Function> callback) {
   this->connection = connection;
+  this->connection->Ref();
   this->sql = sql;
   this->outputs = new vector<output_t*>();
   this->error = NULL;
@@ -31,7 +32,7 @@ ExecuteBaton::~ExecuteBaton() {
   ResetRows();
   ResetOutputs();
   ResetError();
-
+  this->connection->Unref();
 }
 
 double CallDateMethod(v8::Local<Date> date, const char* methodName) {
