@@ -363,16 +363,11 @@ NAN_METHOD(Connection::Execute) {
   String::Utf8Value sqlVal(sql);
 
   ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, &values, callback);
-  if (baton->error != NULL) {
-    return NanThrowError(baton->error->c_str());
-  }
-
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_Execute,
-      (uv_after_work_cb) EIO_AfterExecute);
-
   connection->Ref();
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_Execute,
+                (uv_after_work_cb) EIO_AfterExecute);
 
   NanReturnUndefined();
 }
@@ -744,7 +739,7 @@ void Connection::EIO_AfterClose(uv_work_t* req, int status) {
 }
 
 void Connection::EIO_Execute(uv_work_t* req) {
-  ExecuteBaton* baton = static_cast<ExecuteBaton*>(req->data);
+  ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
 
   oracle::occi::Statement* stmt = CreateStatement(baton);
   if (baton->error) return;
@@ -881,9 +876,8 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns,
 }
 
 void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
-
   NanScope();
-  ExecuteBaton* baton = static_cast<ExecuteBaton*>(req->data);
+  ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
 
   baton->connection->Unref();
   try {
@@ -903,7 +897,6 @@ void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
   }
 
   delete baton;
-  delete req;
 }
 
 void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
@@ -1016,19 +1009,11 @@ NAN_METHOD(Connection::ExecuteSync) {
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton;
-  try {
-    Local<Function> callback;
-    baton = new ExecuteBaton(connection, *sqlVal, &values, callback);
-  } catch (NodeOracleException &ex) {
-    return NanThrowError(ex.getMessage().c_str());
-  }
-
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-
+  Local<Function> callback;
+  ExecuteBaton* baton =
+      new ExecuteBaton(connection, *sqlVal, &values, callback);
   baton->connection->Ref();
-  EIO_Execute(req);
+  EIO_Execute(&baton->work_req);
   baton->connection->Unref();
   Handle<Value> argv[2];
   handleResult(baton, argv);

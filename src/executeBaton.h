@@ -88,6 +88,7 @@ public:
   std::vector<output_t*>* outputs; // The output values
   std::string* error; // The error message
   int updateCount; // The update count
+  uv_work_t work_req;
 
   void ResetValues();
   void ResetRows();
