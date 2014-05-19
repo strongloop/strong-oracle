@@ -124,7 +124,7 @@ void ConnectionPool::EIO_Close(uv_work_t* req) {
   }
 }
 
-void ConnectionPool::EIO_AfterClose(uv_work_t* req, int status) {
+void ConnectionPool::EIO_AfterClose(uv_work_t* req) {
   NanScope();
   ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
 
@@ -231,7 +231,7 @@ void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
   }
 }
 
-void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
+void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req) {
   NanScope();
   ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
 
@@ -661,7 +661,7 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
   return row;
 }
 
-void Connection::EIO_AfterCall(uv_work_t* req, int status) {
+void Connection::EIO_AfterCall(uv_work_t* req) {
   NanScope();
   ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
 
@@ -690,8 +690,8 @@ void Connection::EIO_Commit(uv_work_t* req) {
   baton->connection->m_connection->commit();
 }
 
-void Connection::EIO_AfterCommit(uv_work_t* req, int status) {
-  Connection::EIO_AfterCall(req, status);
+void Connection::EIO_AfterCommit(uv_work_t* req) {
+  Connection::EIO_AfterCall(req);
 }
 
 void Connection::EIO_Rollback(uv_work_t* req) {
@@ -700,8 +700,8 @@ void Connection::EIO_Rollback(uv_work_t* req) {
   baton->connection->m_connection->rollback();
 }
 
-void Connection::EIO_AfterRollback(uv_work_t* req, int status) {
-  Connection::EIO_AfterCall(req, status);
+void Connection::EIO_AfterRollback(uv_work_t* req) {
+  Connection::EIO_AfterCall(req);
 }
 
 NAN_METHOD(Connection::Close) {
@@ -731,8 +731,8 @@ void Connection::EIO_Close(uv_work_t* req) {
   }
 }
 
-void Connection::EIO_AfterClose(uv_work_t* req, int status) {
-  Connection::EIO_AfterCall(req, status);
+void Connection::EIO_AfterClose(uv_work_t* req) {
+  Connection::EIO_AfterCall(req);
 }
 
 void Connection::EIO_Execute(uv_work_t* req) {
@@ -872,7 +872,7 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns,
   return retRows;
 }
 
-void Connection::EIO_AfterExecute(uv_work_t* req, int status) {
+void Connection::EIO_AfterExecute(uv_work_t* req) {
   NanScope();
   ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
 

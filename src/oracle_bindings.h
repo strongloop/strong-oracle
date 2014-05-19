@@ -51,7 +51,7 @@ public:
    */
   static NAN_METHOD(Connect);
   static void EIO_Connect(uv_work_t* req);
-  static void EIO_AfterConnect(uv_work_t* req, int status);
+  static void EIO_AfterConnect(uv_work_t* req);
 
   /**
    * connectSync(...)
@@ -63,7 +63,7 @@ public:
    */
   static NAN_METHOD(CreateConnectionPool);
   static void EIO_CreateConnectionPool(uv_work_t* req);
-  static void EIO_AfterCreateConnectionPool(uv_work_t* req, int status);
+  static void EIO_AfterCreateConnectionPool(uv_work_t* req);
 
   /**
    * createConnectionPoolSync(...)

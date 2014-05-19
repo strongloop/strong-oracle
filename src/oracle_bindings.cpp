@@ -142,7 +142,7 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
   }
 }
 
-void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
+void OracleClient::EIO_AfterConnect(uv_work_t* req) {
   NanScope();
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
 
@@ -326,7 +326,7 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
   }
 }
 
-void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
+void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req) {
   NanScope();
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
 
