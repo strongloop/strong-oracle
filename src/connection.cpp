@@ -97,7 +97,7 @@ NAN_METHOD(ConnectionPool::Close) {
   Local<Function> callback;
   if (args.Length() == 1 && args[0]->IsFunction()) {
     callback = Local<Function>::Cast(args[0]);
-  } else if(args.Length() > 1 && args[1]->IsFunction()) {
+  } else if (args.Length() > 1 && args[1]->IsFunction()) {
     callback = Local<Function>::Cast(args[1]);
   }
 
@@ -189,7 +189,8 @@ NAN_METHOD(ConnectionPool::GetConnectionSync) {
     Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
-        connectionPool->getEnvironment(), connectionPool->getConnectionPool(),
+        connectionPool->getEnvironment(),
+        connectionPool,
         conn);
     NanReturnValue(connection);
   } catch (const exception& ex) {
@@ -243,7 +244,8 @@ void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req, int status) {
     Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
     (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
-        baton->environment, baton->connectionPool->getConnectionPool(),
+        baton->connectionPool->getEnvironment(),
+        baton->connectionPool,
         baton->connection);
     argv[1] = connection;
   }
@@ -335,8 +337,8 @@ NAN_METHOD(Connection::CreateReader) {
 }
 
 Connection::Connection() :
-    m_environment(NULL), m_connectionPool(NULL), m_connection(NULL), m_autoCommit(
-        true), m_prefetchRowCount(0) {
+    m_environment(NULL), connectionPool(NULL), m_connection(NULL),
+    m_autoCommit(true), m_prefetchRowCount(0) {
 }
 
 Connection::~Connection() {
@@ -437,13 +439,20 @@ NAN_METHOD(Connection::SetPrefetchRowCount) {
 }
 
 void Connection::closeConnection() {
-  if (m_environment && m_connection) {
-    if (m_connectionPool) {
-      m_connectionPool->releaseConnection(m_connection, "strong-oracle");
-    } else {
-      m_environment->terminateConnection(m_connection);
-    }
+  if(!m_connection) {
+    return;
+  }
+  if(m_environment && !connectionPool) {
+    // The connection is not pooled
+    m_environment->terminateConnection(m_connection);
     m_connection = NULL;
+    return;
+  }
+  // Make sure the connection pool is still open
+  if (m_environment && connectionPool && connectionPool->getConnectionPool()) {
+    connectionPool->getConnectionPool()->releaseConnection(m_connection, "strong-oracle");
+    m_connection = NULL;
+    connectionPool = NULL;
   }
 }
 
@@ -980,11 +989,14 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
 }
 
 void Connection::setConnection(oracle::occi::Environment* environment,
-    oracle::occi::StatelessConnectionPool* connectionPool,
+    ConnectionPool* _connectionPool,
     oracle::occi::Connection* connection) {
   m_environment = environment;
+  connectionPool = _connectionPool;
+  if (connectionPool) {
+    m_environment = connectionPool->getEnvironment();
+  }
   m_connection = connection;
-  m_connectionPool = connectionPool;
 }
 
 NAN_METHOD(Connection::ExecuteSync) {
@@ -1112,9 +1124,9 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
 
   try {
     int status = stmt->execute();
-    if(status == oracle::occi::Statement::UPDATE_COUNT_AVAILABLE) {
+    if (status == oracle::occi::Statement::UPDATE_COUNT_AVAILABLE) {
       baton->updateCount = stmt->getUpdateCount();
-      if(outputParam >= 0) {
+      if (outputParam >= 0) {
         for (vector<output_t*>::iterator iterator = baton->outputs->begin(), end = baton->outputs->end(); iterator != end; ++iterator) {
           output_t* output = *iterator;
           oracle::occi::ResultSet* rs;
@@ -1177,7 +1189,7 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
           }
         }
       }
-    } else if(status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
+    } else if (status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
       rs = stmt->getResultSet();
       CreateColumnsFromResultSet(rs, baton->columns);
       if (baton->error) goto cleanup;

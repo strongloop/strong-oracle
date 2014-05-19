@@ -25,6 +25,7 @@ using namespace v8;
 class ConnectionBaton;
 class ConnectionPoolBaton;
 class ExecuteBaton;
+class ConnectionPool;
 
 /**
  * Wrapper for an OCCI Connection class so that it can be used in JavaScript
@@ -73,15 +74,11 @@ public:
   ~Connection();
 
   void setConnection(oracle::occi::Environment* environment,
-      oracle::occi::StatelessConnectionPool* connectionPool,
+      ConnectionPool* connectionPool,
       oracle::occi::Connection* connection);
 
   oracle::occi::Environment* getEnvironment() {
     return m_environment;
-  }
-
-  oracle::occi::StatelessConnectionPool* getConnectionPool() {
-      return m_connectionPool;
   }
 
   oracle::occi::Connection* getConnection() {
@@ -119,7 +116,7 @@ private:
   oracle::occi::Environment* m_environment;
 
   // The underlying connection pool
-  oracle::occi::StatelessConnectionPool* m_connectionPool;
+  ConnectionPool* connectionPool;
 
   // The underlying connection
   oracle::occi::Connection* m_connection;
