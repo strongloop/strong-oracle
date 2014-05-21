@@ -142,7 +142,7 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
   }
 }
 
-void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
+void OracleClient::EIO_AfterConnect(uv_work_t* req) {
   NanScope();
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
 
@@ -154,7 +154,7 @@ void OracleClient::EIO_AfterConnect(uv_work_t* req, int status) {
     argv[0] = NanUndefined();
     Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
     Handle<Object> connection = ft->GetFunction()->NewInstance();
-    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->client->m_environment, NULL, baton->connection);
+    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->environment, NULL, baton->connection);
     argv[1] = connection;
   }
 
@@ -198,7 +198,7 @@ NAN_METHOD(OracleClient::ConnectSync) {
   Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
   Handle<Object> connection = ft->GetFunction()->NewInstance();
 
-  (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.client->m_environment, NULL, baton.connection);
+  (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.environment, NULL, baton.connection);
 
   NanReturnValue(connection);
 
@@ -326,7 +326,7 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
   }
 }
 
-void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req, int status) {
+void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req) {
   NanScope();
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
 

@@ -25,6 +25,7 @@ using namespace v8;
 class ConnectionBaton;
 class ConnectionPoolBaton;
 class ExecuteBaton;
+class ConnectionPool;
 
 /**
  * Wrapper for an OCCI Connection class so that it can be used in JavaScript
@@ -38,7 +39,7 @@ public:
   // asynchronous execute method
   static NAN_METHOD(Execute);
   static void EIO_Execute(uv_work_t* req);
-  static void EIO_AfterExecute(uv_work_t* req, int status);
+  static void EIO_AfterExecute(uv_work_t* req);
 
   // synchronous execute method
   static NAN_METHOD(ExecuteSync);
@@ -46,17 +47,17 @@ public:
   // asynchronous commit method
   static NAN_METHOD(Commit);
   static void EIO_Commit(uv_work_t* req);
-  static void EIO_AfterCommit(uv_work_t* req, int status);
+  static void EIO_AfterCommit(uv_work_t* req);
 
   // asynchronous rollback method
   static NAN_METHOD(Rollback);
   static void EIO_Rollback(uv_work_t* req);
-  static void EIO_AfterRollback(uv_work_t* req, int status);
+  static void EIO_AfterRollback(uv_work_t* req);
 
   // asynchronous rollback method
   static NAN_METHOD(Close);
   static void EIO_Close(uv_work_t* req);
-  static void EIO_AfterClose(uv_work_t* req, int status);
+  static void EIO_AfterClose(uv_work_t* req);
 
   static NAN_METHOD(Prepare);
   static NAN_METHOD(CreateReader);
@@ -73,15 +74,11 @@ public:
   ~Connection();
 
   void setConnection(oracle::occi::Environment* environment,
-      oracle::occi::StatelessConnectionPool* connectionPool,
+      ConnectionPool* connectionPool,
       oracle::occi::Connection* connection);
 
   oracle::occi::Environment* getEnvironment() {
     return m_environment;
-  }
-
-  oracle::occi::StatelessConnectionPool* getConnectionPool() {
-      return m_connectionPool;
   }
 
   oracle::occi::Connection* getConnection() {
@@ -119,7 +116,7 @@ private:
   oracle::occi::Environment* m_environment;
 
   // The underlying connection pool
-  oracle::occi::StatelessConnectionPool* m_connectionPool;
+  ConnectionPool* connectionPool;
 
   // The underlying connection
   oracle::occi::Connection* m_connection;
@@ -130,7 +127,7 @@ private:
   // Prefetch row count
   int m_prefetchRowCount;
 
-  static void EIO_AfterCall(uv_work_t* req, int status);
+  static void EIO_AfterCall(uv_work_t* req);
   static buffer_t* readClob(oracle::occi::Clob& clobVal, int charForm = SQLCS_IMPLICIT);
   static buffer_t* readBlob(oracle::occi::Blob& blobVal);
 
@@ -152,11 +149,11 @@ public:
 
   static NAN_METHOD(GetConnection);
   static void EIO_GetConnection(uv_work_t* req);
-  static void EIO_AfterGetConnection(uv_work_t* req, int status);
+  static void EIO_AfterGetConnection(uv_work_t* req);
 
   static NAN_METHOD(Close);
   static void EIO_Close(uv_work_t* req);
-  static void EIO_AfterClose(uv_work_t* req, int status);
+  static void EIO_AfterClose(uv_work_t* req);
 
   static NAN_METHOD(GetConnectionSync);
 

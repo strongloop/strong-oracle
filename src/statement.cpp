@@ -84,7 +84,7 @@ void Statement::EIO_Execute(uv_work_t* req) {
   Connection::ExecuteStatement(baton, baton->stmt);
 }
 
-void Statement::EIO_AfterExecute(uv_work_t* req, int status) {
+void Statement::EIO_AfterExecute(uv_work_t* req) {
   NanScope();
   StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
