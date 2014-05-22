@@ -16,7 +16,7 @@ public:
   static NAN_METHOD(New);
   static NAN_METHOD(Execute);
   static void EIO_Execute(uv_work_t* req);
-  static void EIO_AfterExecute(uv_work_t* req, int status);
+  static void EIO_AfterExecute(uv_work_t* req);
 
   Statement();
   ~Statement();

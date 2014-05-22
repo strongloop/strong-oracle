@@ -10,14 +10,14 @@ Persistent<FunctionTemplate> Reader::s_ct;
 void Reader::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  NanAssignPersistent(FunctionTemplate, Reader::s_ct, t);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
+  NanAssignPersistent(Reader::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(String::NewSymbol("Reader"));
+  t->SetClassName(NanSymbol("Reader"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "nextRows", NextRows);
-  target->Set(String::NewSymbol("Reader"), t->GetFunction());
+  target->Set(NanSymbol("Reader"), t->GetFunction());
 }
 
 Reader::Reader(): ObjectWrap() {
@@ -47,7 +47,7 @@ NAN_METHOD(Reader::NextRows) {
   Reader* reader = ObjectWrap::Unwrap<Reader>(args.This());
   ReaderBaton* baton = reader->m_baton;
   if (baton->error) {
-    Local<String> message = String::New(baton->error->c_str());
+    Local<String> message = NanNew<String>(baton->error->c_str());
     return NanThrowError(message);
   }
   if (baton->busy) {
@@ -67,16 +67,16 @@ NAN_METHOD(Reader::NextRows) {
   }
   if (baton->count <= 0) baton->count = 1;
 
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_NextRows, (uv_after_work_cb)EIO_AfterNextRows);
-  baton->connection->Ref();
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_NextRows,
+                (uv_after_work_cb) EIO_AfterNextRows);
 
   NanReturnUndefined();
 }
 
 void Reader::EIO_NextRows(uv_work_t* req) {
-  ReaderBaton* baton = static_cast<ReaderBaton*>(req->data);
+  ReaderBaton* baton = CONTAINER_OF(req, ReaderBaton, work_req);
 
   baton->rows = new vector<row_t*>();
   if (baton->done) return;
@@ -116,10 +116,9 @@ void Reader::EIO_NextRows(uv_work_t* req) {
 
 void Reader::EIO_AfterNextRows(uv_work_t* req, int status) {
   NanScope();
-  ReaderBaton* baton = static_cast<ReaderBaton*>(req->data);
+  ReaderBaton* baton = CONTAINER_OF(req, ReaderBaton, work_req);
 
   baton->busy = false;
-  baton->connection->Unref();
 
   Handle<Value> argv[2];
   Connection::handleResult(baton, argv);
@@ -130,9 +129,7 @@ void Reader::EIO_AfterNextRows(uv_work_t* req, int status) {
     // reader destructor will delete the baton and everything else.
     baton->ResetStatement();
   }
-  delete req;
 
   // invoke callback at the very end because callback may re-enter nextRows.
   baton->callback->Call(2, argv);
 }
-

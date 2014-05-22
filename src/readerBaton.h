@@ -6,8 +6,9 @@
 
 class ReaderBaton: public StatementBaton {
 public:
-  ReaderBaton(Connection* connection, const char* sql,
-      v8::Local<v8::Array>* values) :
+  ReaderBaton(Connection* connection,
+              const char* sql,
+              v8::Local<v8::Array> values) :
       StatementBaton(connection, sql, values) {
     stmt = NULL;
     rs = NULL;

@@ -10,10 +10,10 @@ Persistent<FunctionTemplate> Statement::s_ct;
 void Statement::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  NanAssignPersistent(FunctionTemplate, Statement::s_ct, t);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
+  NanAssignPersistent(Statement::s_ct, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(String::NewSymbol("Statement"));
+  t->SetClassName(NanSymbol("Statement"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
   target->Set(NanSymbol("Statement"), t->GetFunction());
@@ -51,9 +51,9 @@ NAN_METHOD(Statement::Execute) {
 
   baton->callback = new NanCallback(callback);
 
-  ExecuteBaton::CopyValuesToBaton(baton, &values);
+  ExecuteBaton::CopyValuesToBaton(baton, values);
   if (baton->error) {
-    Local<String> message = String::New(baton->error->c_str());
+    Local<String> message = NanNew<String>(baton->error->c_str());
     return NanThrowError(message);
   }
 
@@ -62,16 +62,16 @@ NAN_METHOD(Statement::Execute) {
   }
   baton->busy = true;
 
-  uv_work_t* req = new uv_work_t();
-  req->data = baton;
-  uv_queue_work(uv_default_loop(), req, EIO_Execute, (uv_after_work_cb)EIO_AfterExecute);
-  baton->connection->Ref();
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                EIO_Execute,
+                (uv_after_work_cb) EIO_AfterExecute);
 
   NanReturnUndefined();
 }
 
 void Statement::EIO_Execute(uv_work_t* req) {
-  StatementBaton* baton = static_cast<StatementBaton*>(req->data);
+  StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
   if (!baton->connection->getConnection()) {
     baton->error = new std::string("Connection already closed");
@@ -84,12 +84,11 @@ void Statement::EIO_Execute(uv_work_t* req) {
   Connection::ExecuteStatement(baton, baton->stmt);
 }
 
-void Statement::EIO_AfterExecute(uv_work_t* req, int status) {
+void Statement::EIO_AfterExecute(uv_work_t* req) {
   NanScope();
-  StatementBaton* baton = static_cast<StatementBaton*>(req->data);
+  StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
   baton->busy = false;
-  baton->connection->Unref();
 
   Handle<Value> argv[2];
   Connection::handleResult(baton, argv);
@@ -98,7 +97,6 @@ void Statement::EIO_AfterExecute(uv_work_t* req, int status) {
   baton->ResetRows();
   baton->ResetOutputs();
   baton->ResetError();
-  delete req;
 
   // invoke callback at the very end because callback may re-enter execute.
   baton->callback->Call(2, argv);

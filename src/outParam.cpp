@@ -17,8 +17,8 @@ Persistent<FunctionTemplate> OutParam::constructorTemplate;
 void OutParam::Init(Handle<Object> target) {
   NanScope();
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(New);
-  NanAssignPersistent(FunctionTemplate, constructorTemplate, t);
+  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
+  NanAssignPersistent(constructorTemplate, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(NanSymbol("OutParam"));
   target->Set(NanSymbol("OutParam"),
@@ -42,7 +42,7 @@ NAN_METHOD(OutParam::New) {
     OBJ_GET_NUMBER(opts, "size", outParam->_size, 200);
 
     // check if there's an 'in' param
-    if (opts->Has(String::New("in"))) {
+    if (opts->Has(NanNew<String>("in"))) {
       outParam->_inOut.hasInParam = true;
       switch (outParam->_type) {
       case OutParam::OCCIINT: {

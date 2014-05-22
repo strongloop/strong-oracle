@@ -51,7 +51,7 @@ public:
    */
   static NAN_METHOD(Connect);
   static void EIO_Connect(uv_work_t* req);
-  static void EIO_AfterConnect(uv_work_t* req, int status);
+  static void EIO_AfterConnect(uv_work_t* req);
 
   /**
    * connectSync(...)
@@ -63,15 +63,19 @@ public:
    */
   static NAN_METHOD(CreateConnectionPool);
   static void EIO_CreateConnectionPool(uv_work_t* req);
-  static void EIO_AfterCreateConnectionPool(uv_work_t* req, int status);
+  static void EIO_AfterCreateConnectionPool(uv_work_t* req);
 
   /**
    * createConnectionPoolSync(...)
    */
   static NAN_METHOD(CreateConnectionPoolSync);
 
-  OracleClient();
+  explicit OracleClient(oracle::occi::Environment::Mode mode = oracle::occi::Environment::THREADED_MUTEXED);
   ~OracleClient();
+
+  oracle::occi::Environment* getEnvironment() {
+    return m_environment;
+  }
 
 private:
   static Persistent<FunctionTemplate> s_ct;
@@ -84,8 +88,9 @@ private:
  */
 class ConnectBaton {
 public:
-  ConnectBaton(OracleClient* client, oracle::occi::Environment* environment,
-      v8::Handle<v8::Function>* callback);
+  ConnectBaton(OracleClient* client,
+               oracle::occi::Environment* environment,
+               v8::Handle<v8::Function> callback = v8::Handle<v8::Function>());
   ~ConnectBaton();
 
   /**
@@ -96,7 +101,7 @@ public:
   /**
    * The callback function
    */
-  NanCallback *callback;
+  NanCallback callback;
 
   /**
    * host name or ip address for the DB server
@@ -164,6 +169,8 @@ public:
    * Error message
    */
   std::string* error;
+
+  uv_work_t work_req;
 };
 
 #endif

@@ -62,6 +62,8 @@ struct output_t {
   oracle::occi::Timestamp timestampVal;
   oracle::occi::Number numberVal;
   oracle::occi::Blob blobVal;
+  size_t bufLength;
+  uint8_t *bufVal;
 };
 
 /**
@@ -69,8 +71,11 @@ struct output_t {
  */
 class ExecuteBaton {
 public:
-  ExecuteBaton(Connection* connection, const char* sql,
-      v8::Local<v8::Array>* values, v8::Handle<v8::Function>* callback);
+  ExecuteBaton(Connection* connection,
+               const char* sql,
+               v8::Local<v8::Array> values,
+               v8::Local<v8::Function> callback = v8::Local<v8::Function>());
+
   ~ExecuteBaton();
 
   Connection *connection; // The JS connection object
@@ -82,6 +87,7 @@ public:
   std::vector<output_t*>* outputs; // The output values
   std::string* error; // The error message
   int updateCount; // The update count
+  uv_work_t work_req;
 
   void ResetValues();
   void ResetRows();
@@ -89,7 +95,7 @@ public:
   void ResetError();
 
   static void CopyValuesToBaton(ExecuteBaton* baton,
-      v8::Local<v8::Array>* values);
+                                v8::Local<v8::Array> values);
 };
 
 #endif

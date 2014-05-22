@@ -1,17 +1,29 @@
-var ora = require('../lib/oracle');
 var settings = {
-  host:'localhost',
-  database:'XE',
-  username:'scott',
-  password:'tiger',
   minConn:1,
   maxConn:5,
   incrConn:1,
-  timeout: 10
+  timeout: 10,
+  // host: 'demo.strongloop.com',
+  // database: 'demo',
+  tns: 'demo', // The tns can be //host:port/database, an tns name or ldap name
+  user: 'demo',
+  password: 'L00pBack',
+  /*
+  ldap: {
+    adminContext: 'dc=strongloop,dc=com',
+    host:'localhost',
+    port: 1389,
+    user:'cn=root',
+    password:'secret'
+  }*/
 };
 
-var sql = 'SELECT ID, NAME FROM PRODUCT';
-// var pool = ora.createConnectionPoolSync(settings);
+var path = require('path');
+process.env.TNS_ADMIN= path.join(__dirname, 'admin');
+
+var ora = require('../lib/oracle')(settings);
+
+var sql = 'SELECT * FROM PRODUCT';
 
 ora.createConnectionPool(settings, function(err, pool) {
   if(err) {

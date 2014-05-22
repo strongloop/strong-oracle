@@ -6,19 +6,16 @@
 
 using namespace std;
 
-ExecuteBaton::ExecuteBaton(Connection* connection, const char* sql,
-    v8::Local<v8::Array>* values, Handle<v8::Function>* callback) {
+ExecuteBaton::ExecuteBaton(Connection* connection,
+                           const char* sql,
+                           v8::Local<v8::Array> values,
+                           v8::Local<v8::Function> callback) {
   this->connection = connection;
+  this->connection->Ref();
   this->sql = sql;
-  if (callback != NULL) {
-    NanCallback *cb = new NanCallback(*callback);
-    this->callback = cb;
-  } else {
-    NanCallback *cb = new NanCallback();
-    this->callback = cb;
-  }
   this->outputs = new vector<output_t*>();
   this->error = NULL;
+  this->callback = callback.IsEmpty() ? NULL : new NanCallback(callback);
   CopyValuesToBaton(this, values);
 }
 
@@ -35,13 +32,13 @@ ExecuteBaton::~ExecuteBaton() {
   ResetRows();
   ResetOutputs();
   ResetError();
-
+  this->connection->Unref();
 }
 
 double CallDateMethod(v8::Local<Date> date, const char* methodName) {
   Handle<Value> args[1]; // should be zero but on windows the compiler will not allow a zero length array
   v8::Local<Value> result = v8::Local<v8::Function>::Cast(
-      date->Get(String::New(methodName)))->Call(date, 0, args);
+      date->Get(NanNew<String>(methodName)))->Call(date, 0, args);
   return v8::Local<v8::Number>::Cast(result)->Value();
 }
 
@@ -62,14 +59,11 @@ oracle::occi::Timestamp* V8DateToOcciDate(oracle::occi::Environment* env,
 }
 
 void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
-    v8::Local<v8::Array>* values) {
+                                     v8::Local<v8::Array> values) {
+  if (values.IsEmpty()) return;
 
-  if (values == NULL) {
-    return;
-  }
-
-  for (uint32_t i = 0; i < (*values)->Length(); i++) {
-    v8::Local<Value> val = (*values)->Get(i);
+  for (uint32_t i = 0; i < values->Length(); i++) {
+    v8::Local<Value> val = values->Get(i);
     value_t *value = new value_t();
 
     // null
