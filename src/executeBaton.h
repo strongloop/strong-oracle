@@ -5,6 +5,7 @@ class Connection;
 
 #include <v8.h>
 #include <node.h>
+#include "nan.h"
 #include <node_buffer.h>
 #ifndef WIN32
 #include <unistd.h>
