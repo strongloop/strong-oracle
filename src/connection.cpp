@@ -34,7 +34,7 @@ void ConnectionPool::Init(Handle<Object> target) {
   NanAssignPersistent(ConnectionPool::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanSymbol("ConnectionPool"));
+  t->SetClassName(NanNew<String>("ConnectionPool"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "getConnectionSync", ConnectionPool::GetConnectionSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getConnection", ConnectionPool::GetConnection);
@@ -42,7 +42,7 @@ void ConnectionPool::Init(Handle<Object> target) {
   NODE_SET_PROTOTYPE_METHOD(t, "closeSync", ConnectionPool::CloseSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getInfo", ConnectionPool::GetInfo);
 
-  target->Set(NanSymbol("ConnectionPool"), t->GetFunction());
+  target->Set(NanNew<String>("ConnectionPool"), t->GetFunction());
 }
 
 NAN_METHOD(ConnectionPool::New) {
@@ -154,22 +154,22 @@ NAN_METHOD(ConnectionPool::GetInfo) {
   if (connectionPool->m_connectionPool) {
     Local<Object> obj = NanNew<Object>();
 
-    obj->Set(NanSymbol("openConnections"),
+    obj->Set(NanNew<String>("openConnections"),
         NanNew<Uint32>(connectionPool->m_connectionPool->getOpenConnections()));
-    obj->Set(NanSymbol("busyConnections"),
+    obj->Set(NanNew<String>("busyConnections"),
         NanNew<Uint32>(connectionPool->m_connectionPool->getBusyConnections()));
-    obj->Set(NanSymbol("maxConnections"),
+    obj->Set(NanNew<String>("maxConnections"),
         NanNew<Uint32>(connectionPool->m_connectionPool->getMaxConnections()));
-    obj->Set(NanSymbol("minConnections"),
+    obj->Set(NanNew<String>("minConnections"),
         NanNew<Uint32>(connectionPool->m_connectionPool->getMinConnections()));
-    obj->Set(NanSymbol("incrConnections"),
+    obj->Set(NanNew<String>("incrConnections"),
         NanNew<Uint32>(connectionPool->m_connectionPool->getIncrConnections()));
-    obj->Set(NanSymbol("busyOption"),
+    obj->Set(NanNew<String>("busyOption"),
         NanNew<Uint32>(static_cast<unsigned int>(connectionPool->m_connectionPool->getBusyOption())));
-    obj->Set(NanSymbol("timeout"),
+    obj->Set(NanNew<String>("timeout"),
         NanNew<Uint32>(connectionPool->m_connectionPool->getTimeOut()));
 
-    obj->Set(NanSymbol("poolName"),
+    obj->Set(NanNew<String>("poolName"),
         NanNew<String>(connectionPool->m_connectionPool->getPoolName().c_str()));
 
     NanReturnValue(obj);
@@ -275,7 +275,7 @@ void Connection::Init(Handle<Object> target) {
   NanAssignPersistent(Connection::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanSymbol("Connection"));
+  t->SetClassName(NanNew<String>("Connection"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
   NODE_SET_PROTOTYPE_METHOD(t, "executeSync", ExecuteSync);
@@ -289,7 +289,7 @@ void Connection::Init(Handle<Object> target) {
   NODE_SET_PROTOTYPE_METHOD(t, "commit", Commit);
   NODE_SET_PROTOTYPE_METHOD(t, "rollback", Rollback);
 
-  target->Set(NanSymbol("Connection"), t->GetFunction());
+  target->Set(NanNew<String>("Connection"), t->GetFunction());
 }
 
 NAN_METHOD(Connection::New) {

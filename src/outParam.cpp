@@ -20,8 +20,8 @@ void OutParam::Init(Handle<Object> target) {
   Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
   NanAssignPersistent(constructorTemplate, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanSymbol("OutParam"));
-  target->Set(NanSymbol("OutParam"),
+  t->SetClassName(NanNew<String>("OutParam"));
+  target->Set(NanNew<String>("OutParam"),
       t->GetFunction());
 }
 

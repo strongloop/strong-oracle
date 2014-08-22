@@ -54,14 +54,14 @@ void OracleClient::Init(Handle<Object> target) {
   Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
   NanAssignPersistent(OracleClient::s_ct, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanSymbol("OracleClient"));
+  t->SetClassName(NanNew<String>("OracleClient"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "connect", Connect);
   NODE_SET_PROTOTYPE_METHOD(t, "connectSync", ConnectSync);
   NODE_SET_PROTOTYPE_METHOD(t, "createConnectionPoolSync", CreateConnectionPoolSync);
   NODE_SET_PROTOTYPE_METHOD(t, "createConnectionPool", CreateConnectionPool);
 
-  target->Set(NanSymbol("OracleClient"), t->GetFunction());
+  target->Set(NanNew<String>("OracleClient"), t->GetFunction());
 }
 
 NAN_METHOD(OracleClient::New) {
