@@ -14,10 +14,10 @@ void Reader::Init(Handle<Object> target) {
   NanAssignPersistent(Reader::s_ct, t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanSymbol("Reader"));
+  t->SetClassName(NanNew<String>("Reader"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "nextRows", NextRows);
-  target->Set(NanSymbol("Reader"), t->GetFunction());
+  target->Set(NanNew<String>("Reader"), t->GetFunction());
 }
 
 Reader::Reader(): ObjectWrap() {

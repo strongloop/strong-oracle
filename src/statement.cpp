@@ -13,10 +13,10 @@ void Statement::Init(Handle<Object> target) {
   Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
   NanAssignPersistent(Statement::s_ct, t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanSymbol("Statement"));
+  t->SetClassName(NanNew<String>("Statement"));
 
   NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
-  target->Set(NanSymbol("Statement"), t->GetFunction());
+  target->Set(NanNew<String>("Statement"), t->GetFunction());
 }
 
 Statement::Statement(): ObjectWrap() {

@@ -78,6 +78,16 @@ If you have VisualStudio 2010 installed,
 
 **Please make sure c:\instantclient_12_1\vc10 comes before c:\instantclient_12_1**
 
+4. Optionally configure the OCI version
+
+`strong-oracle` defaults to OCI v12 (v11 on Mac OS X.)  To make it use an older
+or newer version of the OCI libraries, use the following:
+
+    export GYP_DEFINES="oci_version=11"
+
+On Windows:
+
+    GYP_DEFINES="oci_version=11"
 
 # Examples
 

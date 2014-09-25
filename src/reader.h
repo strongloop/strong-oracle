@@ -3,6 +3,10 @@
 
 #include <v8.h>
 #include <node.h>
+#include "nan.h"
+#ifndef WIN32
+#include <unistd.h>
+#endif
 #include <occi.h>
 #include "readerBaton.h"
 
