@@ -32,7 +32,6 @@ ExecuteBaton::~ExecuteBaton() {
   ResetRows();
   ResetOutputs();
   ResetError();
-  this->connection->Unref();
 }
 
 double CallDateMethod(v8::Local<Date> date, const char* methodName) {

@@ -94,7 +94,8 @@ On Windows:
 The simplest way to connect to the database uses the following code:
 
 ```javascript
-var oracle = require("oracle");
+var settings = {};
+var oracle = require("oracle")(settings);
 
 var connectData = { "hostname": "localhost", "user": "test", "password": "test", "database": "ORCL" };
 
