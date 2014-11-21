@@ -206,7 +206,6 @@ public:
   ~ConnectionPoolBaton() {
     delete error;
     delete callback;
-    this->connectionPool->Unref();
   }
 
   oracle::occi::Environment* environment;
@@ -233,7 +232,6 @@ public:
   ~ConnectionBaton() {
     delete error;
     delete callback;
-    this->connection->Unref();
   }
 
   Connection *connection;
