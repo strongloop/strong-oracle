@@ -14,7 +14,7 @@ Contributing to `strong-oracle` is easy. In a few simple steps:
   * Adhere to code style outlined in the [Google C++ Style Guide][] and
     [Google Javascript Style Guide][].
 
-  * Sign the [Contributor License Agreement](https://cla.strongloop.com/strongloop/strong-oracle)
+  * Sign the [Contributor License Agreement](https://cla.strongloop.com/agreements/strongloop/strong-oracle)
 
   * Submit a pull request through Github.
 
