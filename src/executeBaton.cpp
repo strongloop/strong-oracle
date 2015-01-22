@@ -9,6 +9,7 @@ using namespace std;
 ExecuteBaton::ExecuteBaton(Connection* connection,
                            const char* sql,
                            v8::Local<v8::Array> values,
+                           v8::Local<v8::Object> options,
                            v8::Local<v8::Function> callback) {
   this->connection = connection;
   this->connection->Ref();
@@ -17,6 +18,7 @@ ExecuteBaton::ExecuteBaton(Connection* connection,
   this->error = NULL;
   this->callback = callback.IsEmpty() ? NULL : new NanCallback(callback);
   CopyValuesToBaton(this, values);
+  SetOptionsInBaton(this, options);
 }
 
 ExecuteBaton::~ExecuteBaton() {
@@ -141,6 +143,14 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     }
 
   }
+}
+
+void ExecuteBaton::SetOptionsInBaton(ExecuteBaton* baton,
+                                     v8::Local<v8::Object> options) {
+  baton->getColumnMetaData =
+    !options.IsEmpty()
+       ? options->Get(NanNew<String>("getColumnMetaData"))->BooleanValue()
+       : false;
 }
 
 void ExecuteBaton::ResetValues() {
