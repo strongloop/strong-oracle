@@ -105,6 +105,7 @@ public:
       std::vector<row_t*>* rows);
   static Local<Object> CreateV8ObjectFromRow(std::vector<column_t*> columns,
       row_t* currentRow);
+  static Local<Array> CreateV8ArrayFromCols(std::vector<column_t*> columns);
 
   // shared with Statement
   static oracle::occi::Statement* CreateStatement(ExecuteBaton* baton);

@@ -358,11 +358,26 @@ NAN_METHOD(Connection::Execute) {
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
-  REQ_FUN_ARG(2, callback);
+  Local<Object> options;
+  int cbIndex = 2;
+  if (args.Length() > 3 && args[2]->IsObject() && !args[2]->IsFunction())
+  {
+    options = Local<Object>::Cast(args[2]);
+    ++cbIndex;
+  }
+  if (args.Length() <= cbIndex || !args[cbIndex]->IsFunction())
+  {
+    ostringstream oss;
+    oss << "Argument " << cbIndex << " must be a function";
+    std::string strMsg = std::string(oss.str().c_str());
+    throw NodeOracleException(strMsg);
+  }
+  Local<Function> callback = Local<Function>::Cast(args[cbIndex]);
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values, callback);
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values, options,
+                                         callback);
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
                 EIO_Execute,
@@ -894,6 +909,21 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns,
   return retRows;
 }
 
+Local<Array> Connection::CreateV8ArrayFromCols(std::vector<column_t*> columns)
+{
+  Local<Array> v8cols = NanNew<Array>(columns.size());
+  uint32_t index = 0;
+  for (std::vector<column_t*>::iterator iterator = columns.begin(), end =columns.end(); iterator != end; ++iterator, ++index)
+  {
+     column_t* col = *iterator;
+     Local<Object> v8col = NanNew<Object>();
+     v8col->Set(NanNew<String>("name"), NanNew<String>(col->name.c_str()));
+     v8col->Set(NanNew<String>("type"), NanNew<Number>((double)(col->type)));
+     v8cols->Set(index, v8col);
+  }
+  return v8cols;
+}
+
 void Connection::EIO_AfterExecute(uv_work_t* req) {
   NanScope();
   ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
@@ -925,7 +955,12 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
     } else {
       argv[0] = NanUndefined();
       if (baton->rows) {
-        argv[1] = CreateV8ArrayFromRows(baton->columns, baton->rows);
+        Local<Object> obj = CreateV8ArrayFromRows(baton->columns, baton->rows);
+        if (baton->getColumnMetaData) {
+          obj->Set(NanNew<String>("columnMetaData"),
+                   CreateV8ArrayFromCols(baton->columns));
+        }
+        argv[1] = obj;
       } else {
         Local<Object> obj = NanNew<Object>();
         obj->Set(NanNew<String>("updateCount"), NanNew<Integer>(baton->updateCount));
@@ -1027,10 +1062,13 @@ NAN_METHOD(Connection::ExecuteSync) {
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
+  Local<Object> options;
+  if (args.Length() > 2 && args[2]->IsObject() && !args[2]->IsFunction())
+    options = Local<Object>::Cast(args[2]);
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values);
+  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values, options);
   EIO_Execute(&baton->work_req);
   Handle<Value> argv[2];
   handleResult(baton, argv);

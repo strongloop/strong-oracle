@@ -240,6 +240,35 @@ describe('oracle driver', function () {
       });
   });
 
+  it("should support select with getColumnMetaData", function(done) {
+    var self = this;
+    self.connection.execute("INSERT INTO person (name) VALUES (:1)", ["Bill O'Neil"], function(err, results) {
+      if(err) { console.error(err); return; }
+      self.connection.execute("SELECT * FROM person", [], {getColumnMetaData:true}, function(err, results) {
+        if(err) { console.error(err); return; }
+        assert.equal(results.length, 1);
+        assert.deepEqual(results.columnMetaData, [ { name: 'ID', type: 4 }, { name: 'NAME', type: 3 } ]);
+        self.connection.execute("SELECT * FROM datatype_test", [], {getColumnMetaData:true}, function(err, results) {
+          if(err) { console.error(err); return; }
+          assert.equal(results.length, 0);
+          assert.deepEqual(results.columnMetaData,
+                           [ { name: 'ID', type: 4 },
+                             { name: 'TVARCHAR2', type: 3 },
+                             { name: 'TNVARCHAR2', type: 3 },
+                             { name: 'TCHAR', type: 3 },
+                             { name: 'TNCHAR', type: 3 },
+                             { name: 'TNUMBER', type: 4 },
+                             { name: 'TDATE', type: 5 },
+                             { name: 'TTIMESTAMP', type: 6 },
+                             { name: 'TCLOB', type: 7 },
+                             { name: 'TNCLOB', type: 7 },
+                             { name: 'TBLOB', type: 8 } ]);
+          done();
+        });
+      });
+    });
+  });
+
   // FIXME: [rfeng] Investigate why the following test is failing
   /*
   it("should support utf8_chars_in_query", function (done) {
