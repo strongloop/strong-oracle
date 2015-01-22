@@ -214,15 +214,23 @@ describe('stored procedures with out params', function () {
 
   it("should support cursor out param", function (done) {
     var self = this;
-    self.connection.execute("call procCursorOutParam(:1)",
-      [new oracle.OutParam(oracle.OCCICURSOR)], function (err, results) {
-        if (err) {
-          done(err);
-          return;
-        }
-        assert.equal(results.returnParam.length, 0);
-        done();
-      });
+
+    self.connection.execute("DELETE FROM person", [], function (err, results) {
+      if (err) {
+        done(err);
+        return;
+      }
+
+      self.connection.execute("call procCursorOutParam(:1)",
+        [new oracle.OutParam(oracle.OCCICURSOR)], function (err, results) {
+          if (err) {
+            done(err);
+            return;
+          }
+          assert.equal(results.returnParam.length, 0);
+          done();
+        });
+     });
   });
 
   it("should support clob out param", function (done) {

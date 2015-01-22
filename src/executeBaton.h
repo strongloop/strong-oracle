@@ -75,6 +75,7 @@ public:
   ExecuteBaton(Connection* connection,
                const char* sql,
                v8::Local<v8::Array> values,
+               v8::Local<v8::Object> options,
                v8::Local<v8::Function> callback = v8::Local<v8::Function>());
 
   ~ExecuteBaton();
@@ -87,6 +88,7 @@ public:
   std::vector<row_t*>* rows; // The list of rows
   std::vector<output_t*>* outputs; // The output values
   std::string* error; // The error message
+  bool getColumnMetaData;
   int updateCount; // The update count
   uv_work_t work_req;
 
@@ -97,6 +99,8 @@ public:
 
   static void CopyValuesToBaton(ExecuteBaton* baton,
                                 v8::Local<v8::Array> values);
+  static void SetOptionsInBaton(ExecuteBaton* baton,
+                                v8::Local<v8::Object> options);
 };
 
 #endif

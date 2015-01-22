@@ -9,7 +9,7 @@ public:
   StatementBaton(Connection* connection,
                  const char* sql,
                  v8::Local<v8::Array> values = v8::Local<v8::Array>())
-      : ExecuteBaton(connection, sql, values) {
+    : ExecuteBaton(connection, sql, values, Local<Object>()) {
     stmt = NULL;
     done = false;
     busy = false;
