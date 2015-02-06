@@ -95,7 +95,7 @@ The simplest way to connect to the database uses the following code:
 
 ```javascript
 var settings = {};
-var oracle = require("oracle")(settings);
+var oracle = require("strong-oracle")(settings);
 
 var connectData = { "hostname": "localhost", "user": "test", "password": "test", "database": "ORCL" };
 
