@@ -67,8 +67,8 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     v8::Local<Value> val = values->Get(i);
     value_t *value = new value_t();
 
-    // null
-    if (val->IsNull()) {
+    // null or undefined
+    if (val->IsNull() || val->IsUndefined()) {
       value->type = VALUE_TYPE_NULL;
       value->value = NULL;
       baton->values.push_back(value);
