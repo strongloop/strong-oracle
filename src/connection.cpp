@@ -1205,6 +1205,7 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
               break;
             case OutParam::OCCICURSOR:
               rs = stmt->getCursor(output->index);
+              rs->setPrefetchRowCount(baton->connection->getPrefetchRowCount());
               CreateColumnsFromResultSet(rs, output->columns);
               if (baton->error) goto cleanup;
               output->rows = new vector<row_t*>();
@@ -1251,6 +1252,7 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
       }
     } else if (status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
       rs = stmt->getResultSet();
+      rs->setPrefetchRowCount(baton->connection->getPrefetchRowCount());
       CreateColumnsFromResultSet(rs, baton->columns);
       if (baton->error) goto cleanup;
       baton->rows = new vector<row_t*>();
