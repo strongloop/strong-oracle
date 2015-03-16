@@ -875,9 +875,9 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
       case VALUE_TYPE_BLOB: {
         buffer_t *v = (buffer_t *) val;
         // convert to V8 buffer
-        v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)v->data, v->length);
+        v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)v->data, (uint32_t)v->length);
         obj->Set(NanNew<String>(col->name.c_str()), v8Buffer);
-        delete[] v->data;
+        // Nan will free the memory of the buffer
         delete v;
         break;
       }
