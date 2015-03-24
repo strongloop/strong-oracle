@@ -1,3 +1,17 @@
+2015-03-24, Version 1.4.0
+=========================
+
+ * Enable Segfault handler (Raymond Feng)
+
+ * Fixed invalid freeing of memory. Added type cast for buffer length (Vincent Schoettke)
+
+ * allow for undefined statement parameters (richlim)
+
+ * apply prefetch row count to every result set (richlim)
+
+ * Fix the module name (Raymond Feng)
+
+
 2015-01-22, Version 1.3.0
 =========================
 
@@ -252,100 +266,6 @@
  * Find a way to get windows working (Raymond Feng)
 
  * Assign floating pointers to NULL, for safety (Sam Roberts)
-
-
-2014-02-11, Version 0.3.6
-=========================
-
- * Add 'Prerequsites' section (python, gcc) to basic install notes (John Coulter)
-
- * Added generic exception catcher to baton->createConnection to handle TNS not found errors (Giles Williams)
-
- * small edits to README (Bruno Jouhier)
-
- * added prepare API (Bruno Jouhier)
-
- * fixed memory leak on input parameters (Bruno Jouhier)
-
- * clear rows before invoking nextRows callback (Bruno Jouhier)
-
- * node 0.10.x was broken (Bruno Jouhier)
-
- * fixed req memory leak in all async calls (Bruno Jouhier)
-
- * cleanup pass on reader implementation (Bruno Jouhier)
-
- * fixed reader JS bindings so that reader handle gets destructed (Bruno Jouhier)
-
- * fixed cursor memory leaks - free rows data and don't wait for gc to release occi cursor (Bruno Jouhier)
-
- * fixed memory management of reader callback (Bruno Jouhier)
-
- * fixed memory/cursor leak in reader (Bruno Jouhier)
-
- * Update connection.cpp (mirozv)
-
- * added reader (Bruno Jouhier)
-
- * reviewed naming of uni macros and functions (Bruno Jouhier)
-
- * issue #112 - code compiles both in 0.10.x and 0.11.10 (Bruno Jouhier)
-
- * fixed incorrect reset of baton->error (Bruno Jouhier)
-
- * removed NodeOracleException (Bruno Jouhier)
-
- * use baton->error rather than throw to signal errors (Bruno Jouhier)
-
- * fixed typo on the Basic Example (ramsesrm)
-
- * Use utf8 V8 string for sql query string (see commit 73264550) (John Coulter)
-
- * Fix: Preserve milliseconds when inserting into TIMESTAMP column, by always using occi::Timestamp for JS Dates. An occi::Timestamp can still be inserted into a DATE column. Add tests for this issue. (John Coulter)
-
- * Fix JS Date --> Oracle Date conversion to use UTC methods. Update unit test, since TIMESTAMPs do store time info. Update README to explain how DATEs and TIMESTAMPs are handled (John Coulter)
-
- * Cleanup README examples and notes, and separate install instructions (John Coulter)
-
- * added license to project and package.json (Joe Ferner)
-
-
-2013-12-06, Version 0.3.5
-=========================
-
- * update git urls (Joe Ferner)
-
- * add nls_lang (tangyao)
-
- * added bash script to check correct environment before installing (Victor Volle)
-
- * added setPrefetchRowCount (Bruno Jouhier)
-
-
-2013-09-09, Version 0.3.4
-=========================
-
- * Fix whitespace and comment wording (John Coulter)
-
- * Cleanup whitespace (2 spaces) (John Coulter)
-
- * Use node::MakeCallback instead of v8::Function::Call (John Coulter)
-
- * Remove duplicate try/catch block which resulted in multiple callbacks (John Coulter)
-
- * Update binding.gyp (maxdm07)
-
- * Rethrow SQLException caught in closeConnection. This could be bad if an SQLException is thrown when the deconstructor calls closeConnection, as terminate will likely be called. (John Coulter)
-
- * Prevent closeConnection() from throwing an occi::SQLException. This might happen if the connection was already invalidated on the server, e.g., after a restart. (John Coulter)
-
-
-2013-08-12, Version 0.3.3
-=========================
-
- * Allow user to specify Instant Client version with OCI_VERSION (John Coulter)
-
- * Closes pull request 54 (Raymond Feng)
 
  * Convert oracle fractional seconds to milliseconds and fix typo in setUTCMilliseconds. (John Coulter)
 
