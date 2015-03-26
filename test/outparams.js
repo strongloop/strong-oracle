@@ -52,7 +52,7 @@
  IS
  BEGIN
  open outParam for
- select * from person;
+ select * from person_test;
  END;
  /
  CREATE OR REPLACE PROCEDURE procCLOBOutParam(outParam OUT CLOB)
@@ -215,7 +215,7 @@ describe('stored procedures with out params', function () {
   it("should support cursor out param", function (done) {
     var self = this;
 
-    self.connection.execute("DELETE FROM person", [], function (err, results) {
+    self.connection.execute("DELETE FROM person_test", [], function (err, results) {
       if (err) {
         done(err);
         return;

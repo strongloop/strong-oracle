@@ -1,13 +1,13 @@
-DROP TABLE person;
-CREATE TABLE person
+DROP TABLE person_test;
+CREATE TABLE person_test
   (id INTEGER PRIMARY KEY, name VARCHAR(255)
   );
 
-DROP SEQUENCE person_seq;
-CREATE SEQUENCE person_seq START WITH 1 INCREMENT BY 1 NOMAXVALUE;
-CREATE OR REPLACE TRIGGER person_pk_trigger BEFORE
-  INSERT ON person FOR EACH row BEGIN
-  SELECT person_seq.nextval INTO :new.id FROM dual;
+DROP SEQUENCE person_test_seq;
+CREATE SEQUENCE person_test_seq START WITH 1 INCREMENT BY 1 NOMAXVALUE;
+CREATE OR REPLACE TRIGGER person_test_pk_trigger BEFORE
+  INSERT ON person_test FOR EACH row BEGIN
+  SELECT person_test_seq.nextval INTO :new.id FROM dual;
 END;
 /
 DROP TABLE datatype_test;
@@ -78,7 +78,7 @@ END;
   IS
   BEGIN
     open outParam for
-    select * from person;
+    select * from person_test;
   END;
   /
   CREATE OR REPLACE PROCEDURE procCLOBOutParam(outParam OUT CLOB)
