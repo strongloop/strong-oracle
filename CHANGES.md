@@ -1,3 +1,11 @@
+2015-03-26, Version 1.6.0
+=========================
+
+ * Change the table name to avoid conflicts (Raymond Feng)
+
+ * Add ConnectionPool.execute (Raymond Feng)
+
+
 2015-03-24, Version 1.5.1
 =========================
 
