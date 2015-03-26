@@ -72,7 +72,11 @@ struct output_t {
  */
 class ExecuteBaton {
 public:
-  ExecuteBaton(Connection* connection,
+  ExecuteBaton(oracle::occi::Environment* m_environment,
+               oracle::occi::StatelessConnectionPool* m_connectionPool,
+               oracle::occi::Connection* m_connection,
+               bool m_autoCommit,
+               int m_prefetchRowCount,
                const char* sql,
                v8::Local<v8::Array> values,
                v8::Local<v8::Object> options,
@@ -80,7 +84,13 @@ public:
 
   ~ExecuteBaton();
 
-  Connection *connection; // The JS connection object
+  oracle::occi::Environment* m_environment;
+  oracle::occi::StatelessConnectionPool* m_connectionPool;
+  oracle::occi::Connection* m_connection;
+  // Autocommit flag
+  bool m_autoCommit;
+  // Prefetch row count
+  int m_prefetchRowCount;
   NanCallback *callback; // The JS callback function
   std::vector<value_t*> values; // The array of parameter values
   std::string sql; // The sql statement string

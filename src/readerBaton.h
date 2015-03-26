@@ -6,10 +6,16 @@
 
 class ReaderBaton: public StatementBaton {
 public:
-  ReaderBaton(Connection* connection,
+  ReaderBaton(oracle::occi::Environment* m_environment,
+              oracle::occi::StatelessConnectionPool* m_connectionPool,
+              oracle::occi::Connection* m_connection,
+              bool m_autoCommit,
+              int m_prefetchRowCount,
               const char* sql,
               v8::Local<v8::Array> values) :
-      StatementBaton(connection, sql, values) {
+      StatementBaton(m_environment, m_connectionPool, m_connection,
+                     m_autoCommit, m_prefetchRowCount,
+                     sql, values) {
     stmt = NULL;
     rs = NULL;
     done = false;

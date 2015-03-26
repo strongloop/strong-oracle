@@ -157,6 +157,11 @@ public:
   static void EIO_Close(uv_work_t* req);
   static void EIO_AfterClose(uv_work_t* req);
 
+  // asynchronous execute method
+  static NAN_METHOD(Execute);
+  static void EIO_Execute(uv_work_t* req);
+  static void EIO_AfterExecute(uv_work_t* req);
+
   static NAN_METHOD(GetConnectionSync);
 
   void closeConnectionPool(

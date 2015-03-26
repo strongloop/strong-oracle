@@ -19,12 +19,14 @@ ConnectionPool::ConnectionPool() :
 }
 
 ConnectionPool::~ConnectionPool() {
+  /*
   try {
     closeConnectionPool(oracle::occi::StatelessConnectionPool::SPD_FORCE);
   } catch (std::exception &ex) {
     m_connectionPool = NULL;
     fprintf(stderr, "%s\n", ex.what());
   }
+  */
 }
 
 void ConnectionPool::Init(Handle<Object> target) {
@@ -38,6 +40,7 @@ void ConnectionPool::Init(Handle<Object> target) {
 
   NODE_SET_PROTOTYPE_METHOD(t, "getConnectionSync", ConnectionPool::GetConnectionSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getConnection", ConnectionPool::GetConnection);
+  NODE_SET_PROTOTYPE_METHOD(t, "execute", ConnectionPool::Execute);
   NODE_SET_PROTOTYPE_METHOD(t, "close", ConnectionPool::Close);
   NODE_SET_PROTOTYPE_METHOD(t, "closeSync", ConnectionPool::CloseSync);
   NODE_SET_PROTOTYPE_METHOD(t, "getInfo", ConnectionPool::GetInfo);
@@ -270,6 +273,94 @@ void ConnectionPool::closeConnectionPool(
   }
 }
 
+NAN_METHOD(ConnectionPool::Execute) {
+  NanScope();
+  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+
+  REQ_STRING_ARG(0, sql);
+  REQ_ARRAY_ARG(1, values);
+  Local<Object> options;
+  int cbIndex = 2;
+  if (args.Length() > 3 && args[2]->IsObject() && !args[2]->IsFunction())
+  {
+    options = Local<Object>::Cast(args[2]);
+    ++cbIndex;
+  }
+  if (args.Length() <= cbIndex || !args[cbIndex]->IsFunction())
+  {
+    ostringstream oss;
+    oss << "Argument " << cbIndex << " must be a function";
+    std::string strMsg = std::string(oss.str().c_str());
+    throw NodeOracleException(strMsg);
+  }
+  Local<Function> callback = Local<Function>::Cast(args[cbIndex]);
+
+  String::Utf8Value sqlVal(sql);
+
+  ExecuteBaton* baton = new ExecuteBaton(connectionPool->m_environment,
+                                         connectionPool->m_connectionPool,
+                                         NULL,
+                                         true,
+                                         10,
+                                         *sqlVal, values, options,
+                                         callback);
+  uv_queue_work(uv_default_loop(),
+                &baton->work_req,
+                ConnectionPool::EIO_Execute,
+                (uv_after_work_cb) ConnectionPool::EIO_AfterExecute);
+
+  NanReturnUndefined();
+}
+
+void ConnectionPool::EIO_Execute(uv_work_t* req) {
+  ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
+
+  if(!baton->m_connection) {
+    oracle::occi::Connection *conn =
+        baton->m_connectionPool->getConnection("strong-oracle");
+    baton->m_connection = conn;
+  }
+  oracle::occi::Statement* stmt = Connection::CreateStatement(baton);
+  if (baton->error) return;
+
+  Connection::ExecuteStatement(baton, stmt);
+
+  if (stmt) {
+    if (baton->m_connection) {
+      baton->m_connection->terminateStatement(stmt);
+    }
+    stmt = NULL;
+  }
+  if (baton->m_connectionPool && baton->m_connection) {
+    baton->m_connectionPool->releaseConnection(baton->m_connection,
+        "strong-oracle");
+    baton->m_connection = NULL;
+  }
+}
+
+void ConnectionPool::EIO_AfterExecute(uv_work_t* req) {
+  NanScope();
+  ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
+
+  try {
+    Handle<Value> argv[2];
+    Connection::handleResult(baton, argv);
+    baton->callback->Call(2, argv);
+  } catch (NodeOracleException &ex) {
+    Handle<Value> argv[2];
+    argv[0] = NanError(ex.getMessage().c_str());
+    argv[1] = NanUndefined();
+    baton->callback->Call(2, argv);
+  } catch (const exception &ex) {
+    Handle<Value> argv[2];
+    argv[0] = NanError(ex.what());
+    argv[1] = NanUndefined();
+    baton->callback->Call(2, argv);
+  }
+
+  delete baton;
+}
+
 void Connection::Init(Handle<Object> target) {
   NanScope();
 
@@ -279,7 +370,7 @@ void Connection::Init(Handle<Object> target) {
   t->InstanceTemplate()->SetInternalFieldCount(1);
   t->SetClassName(NanNew<String>("Connection"));
 
-  NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
+  NODE_SET_PROTOTYPE_METHOD(t, "execute", Connection::Execute);
   NODE_SET_PROTOTYPE_METHOD(t, "executeSync", ExecuteSync);
   NODE_SET_PROTOTYPE_METHOD(t, "readerHandle", CreateReader);
   NODE_SET_PROTOTYPE_METHOD(t, "prepare", Prepare);
@@ -310,7 +401,9 @@ NAN_METHOD(Connection::Prepare) {
 
   String::Utf8Value sqlVal(sql);
 
-  StatementBaton* baton = new StatementBaton(connection, *sqlVal);
+  StatementBaton* baton = new StatementBaton(connection->m_environment, NULL, connection->m_connection,
+      connection->getAutoCommit(), connection->getPrefetchRowCount(),
+      *sqlVal);
   Local<FunctionTemplate> ft = NanNew(Statement::s_ct);
   Handle<Object> statementHandle = ft->GetFunction()->NewInstance();
   Statement* statement = ObjectWrap::Unwrap<Statement>(statementHandle);
@@ -328,7 +421,9 @@ NAN_METHOD(Connection::CreateReader) {
 
   String::Utf8Value sqlVal(sql);
 
-  ReaderBaton* baton = new ReaderBaton(connection, *sqlVal, values);
+  ReaderBaton* baton = new ReaderBaton(connection->m_environment, NULL, connection->m_connection,
+      connection->getAutoCommit(), connection->getPrefetchRowCount(),
+      *sqlVal, values);
 
   Local<FunctionTemplate> ft = NanNew(Reader::s_ct);
   Local<Object> readerHandle = ft->GetFunction()->NewInstance();
@@ -344,12 +439,14 @@ Connection::Connection() :
 }
 
 Connection::~Connection() {
+  /*
   try {
     closeConnection();
   } catch (std::exception &ex) {
     m_connection = NULL;
     fprintf(stderr, "%s\n", ex.what());
   }
+  */
 }
 
 NAN_METHOD(Connection::Execute) {
@@ -376,7 +473,12 @@ NAN_METHOD(Connection::Execute) {
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values, options,
+  ExecuteBaton* baton = new ExecuteBaton(connection->m_environment,
+                                         NULL,
+                                         connection->m_connection,
+                                         connection->getAutoCommit(),
+                                         connection->getPrefetchRowCount(),
+                                         *sqlVal, values, options,
                                          callback);
   uv_queue_work(uv_default_loop(),
                 &baton->work_req,
@@ -781,8 +883,8 @@ void Connection::EIO_Execute(uv_work_t* req) {
   ExecuteStatement(baton, stmt);
 
   if (stmt) {
-    if (baton->connection->m_connection) {
-      baton->connection->m_connection->terminateStatement(stmt);
+    if (baton->m_connection) {
+      baton->m_connection->terminateStatement(stmt);
     }
     stmt = NULL;
   }
@@ -1068,7 +1170,9 @@ NAN_METHOD(Connection::ExecuteSync) {
 
   String::Utf8Value sqlVal(sql);
 
-  ExecuteBaton* baton = new ExecuteBaton(connection, *sqlVal, values, options);
+  ExecuteBaton* baton = new ExecuteBaton(connection->m_environment, NULL, connection->m_connection,
+      connection->getAutoCommit(), connection->getPrefetchRowCount(),
+      *sqlVal, values, options);
   EIO_Execute(&baton->work_req);
   Handle<Value> argv[2];
   handleResult(baton, argv);
@@ -1087,14 +1191,14 @@ oracle::occi::Statement* Connection::CreateStatement(ExecuteBaton* baton) {
   baton->rows = NULL;
   baton->error = NULL;
 
-  if (! baton->connection->m_connection) {
+  if (! baton->m_connection) {
     baton->error = new std::string("Connection already closed");
     return NULL;
   }
   try {
-    oracle::occi::Statement* stmt = baton->connection->m_connection->createStatement(baton->sql);
-    stmt->setAutoCommit(baton->connection->m_autoCommit);
-    if (baton->connection->m_prefetchRowCount > 0) stmt->setPrefetchRowCount(baton->connection->m_prefetchRowCount);
+    oracle::occi::Statement* stmt = baton->m_connection->createStatement(baton->sql);
+    // stmt->setAutoCommit(baton->connection->m_autoCommit);
+    // if (baton->connection->m_prefetchRowCount > 0) stmt->setPrefetchRowCount(baton->connection->m_prefetchRowCount);
     return stmt;
   } catch(oracle::occi::SQLException &ex) {
     baton->error = new string(ex.getMessage());
@@ -1205,7 +1309,7 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
               break;
             case OutParam::OCCICURSOR:
               rs = stmt->getCursor(output->index);
-              rs->setPrefetchRowCount(baton->connection->getPrefetchRowCount());
+              // rs->setPrefetchRowCount(baton->m_connection->getPrefetchRowCount());
               CreateColumnsFromResultSet(rs, output->columns);
               if (baton->error) goto cleanup;
               output->rows = new vector<row_t*>();
@@ -1252,7 +1356,7 @@ void Connection::ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* 
       }
     } else if (status == oracle::occi::Statement::RESULT_SET_AVAILABLE) {
       rs = stmt->getResultSet();
-      rs->setPrefetchRowCount(baton->connection->getPrefetchRowCount());
+      // rs->setPrefetchRowCount(baton->m_connection->getPrefetchRowCount());
       CreateColumnsFromResultSet(rs, baton->columns);
       if (baton->error) goto cleanup;
       baton->rows = new vector<row_t*>();

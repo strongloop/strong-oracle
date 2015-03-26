@@ -73,7 +73,7 @@ NAN_METHOD(Statement::Execute) {
 void Statement::EIO_Execute(uv_work_t* req) {
   StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
-  if (!baton->connection->getConnection()) {
+  if (!baton->m_connection) {
     baton->error = new std::string("Connection already closed");
     return;
   }

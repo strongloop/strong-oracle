@@ -6,13 +6,20 @@
 
 using namespace std;
 
-ExecuteBaton::ExecuteBaton(Connection* connection,
+ExecuteBaton::ExecuteBaton(oracle::occi::Environment* m_environment,
+                           oracle::occi::StatelessConnectionPool* m_connectionPool,
+                           oracle::occi::Connection* m_connection,
+                           bool m_autoCommit,
+                           int m_prefetchRowCount,
                            const char* sql,
                            v8::Local<v8::Array> values,
                            v8::Local<v8::Object> options,
                            v8::Local<v8::Function> callback) {
-  this->connection = connection;
-  this->connection->Ref();
+  this->m_environment = m_environment;
+  this->m_connectionPool = m_connectionPool;
+  this->m_connection = m_connection;
+  this->m_autoCommit = m_autoCommit;
+  this->m_prefetchRowCount = m_prefetchRowCount;
   this->sql = sql;
   this->outputs = new vector<output_t*>();
   this->error = NULL;
@@ -85,7 +92,7 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
     // date
     else if (val->IsDate()) {
       value->type = VALUE_TYPE_TIMESTAMP;
-      value->value = V8DateToOcciDate(baton->connection->getEnvironment(),
+      value->value = V8DateToOcciDate(baton->m_environment,
           val.As<Date>());
       baton->values.push_back(value);
     }

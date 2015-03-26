@@ -62,7 +62,7 @@ NAN_METHOD(Reader::NextRows) {
     baton->callback = new NanCallback(callback);
   } else {
     REQ_FUN_ARG(0, callback);
-    baton->count = baton->connection->getPrefetchRowCount();
+    // baton->count = baton->connection->getPrefetchRowCount();
     baton->callback = new NanCallback(callback);
   }
   if (baton->count <= 0) baton->count = 1;
@@ -81,14 +81,14 @@ void Reader::EIO_NextRows(uv_work_t* req) {
   baton->rows = new vector<row_t*>();
   if (baton->done) return;
 
-  if (!baton->connection->getConnection()) {
+  if (!baton->m_connection) {
     baton->error = new std::string("Connection already closed");
     return;
   }
   if (!baton->rs) {
     try {
-      baton->stmt = baton->connection->getConnection()->createStatement(baton->sql);
-      baton->stmt->setAutoCommit(baton->connection->getAutoCommit());
+      baton->stmt = baton->m_connection->createStatement(baton->sql);
+      // baton->stmt->setAutoCommit(baton->connection->getAutoCommit());
       baton->stmt->setPrefetchRowCount(baton->count);
       Connection::SetValuesOnStatement(baton->stmt, baton->values);
       if (baton->error) return;
