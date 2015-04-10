@@ -1197,8 +1197,10 @@ oracle::occi::Statement* Connection::CreateStatement(ExecuteBaton* baton) {
   }
   try {
     oracle::occi::Statement* stmt = baton->m_connection->createStatement(baton->sql);
-    // stmt->setAutoCommit(baton->connection->m_autoCommit);
-    // if (baton->connection->m_prefetchRowCount > 0) stmt->setPrefetchRowCount(baton->connection->m_prefetchRowCount);
+    stmt->setAutoCommit(baton->m_autoCommit);
+    if (baton->m_prefetchRowCount > 0) {
+      stmt->setPrefetchRowCount(baton->m_prefetchRowCount);
+    }
     return stmt;
   } catch(oracle::occi::SQLException &ex) {
     baton->error = new string(ex.getMessage());

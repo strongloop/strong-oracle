@@ -88,7 +88,7 @@ void Reader::EIO_NextRows(uv_work_t* req) {
   if (!baton->rs) {
     try {
       baton->stmt = baton->m_connection->createStatement(baton->sql);
-      // baton->stmt->setAutoCommit(baton->connection->getAutoCommit());
+      baton->stmt->setAutoCommit(baton->m_autoCommit);
       baton->stmt->setPrefetchRowCount(baton->count);
       Connection::SetValuesOnStatement(baton->stmt, baton->values);
       if (baton->error) return;
