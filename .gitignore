@@ -8,4 +8,4 @@ node_modules
 .project
 .cproject
 .settings
-
+tests-settings.json.bak
