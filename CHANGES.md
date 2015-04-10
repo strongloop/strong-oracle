@@ -1,3 +1,11 @@
+2015-04-10, Version 1.6.1
+=========================
+
+ * Update .gitignore (Raymond Feng)
+
+ * Restore auto commit control (Raymond Feng)
+
+
 2015-03-26, Version 1.6.0
 =========================
 
