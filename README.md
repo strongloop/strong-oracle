@@ -33,8 +33,8 @@ MacOS:
 Linux:
 
     cd $OCI_LIB_DIR
-    ln -s libclntsh.so.11.1 libclntsh.so
-    ln -s libocci.so.11.1 libocci.so
+    ln -s libclntsh.so.12.1 libclntsh.so
+    ln -s libocci.so.12.1 libocci.so
 
 `libaio` library is required on Linux systems:
 
