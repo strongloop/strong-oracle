@@ -1,3 +1,11 @@
+2015-05-04, Version 1.6.2
+=========================
+
+ * Add back prefetchRowCount settings (Raymond Feng)
+
+ * Update linux instruction (Raymond Feng)
+
+
 2015-04-10, Version 1.6.1
 =========================
 
