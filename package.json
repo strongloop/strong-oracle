@@ -25,10 +25,10 @@
     "url": "git://github.com/strongloop/strong-oracle.git"
   },
   "dependencies": {
-    "nan": "~1.7.0"
+    "nan": "^1.8.4"
   },
   "devDependencies": {
-    "mocha": "~2.2.1",
+    "mocha": "~2.2.5",
     "segfault-handler": "^0.2.4"
   },
   "scripts": {
