@@ -1,3 +1,9 @@
+2015-05-15, Version 1.6.4
+=========================
+
+ * Update nan deps to work with iojs 2.0 (Raymond Feng)
+
+
 2015-05-15, Version 1.6.3
 =========================
 
