@@ -62,7 +62,7 @@ NAN_METHOD(Reader::NextRows) {
     baton->callback = new NanCallback(callback);
   } else {
     REQ_FUN_ARG(0, callback);
-    // baton->count = baton->connection->getPrefetchRowCount();
+    baton->count = baton->m_prefetchRowCount;
     baton->callback = new NanCallback(callback);
   }
   if (baton->count <= 0) baton->count = 1;
