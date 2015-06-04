@@ -1225,8 +1225,9 @@ buffer_t* Connection::readClob(oracle::occi::Clob& clobVal, int charForm) {
     break;
   }
 
-  unsigned int lobLength = clobVal.length();
-  unsigned char* lob = new unsigned char[lobLength];
+  unsigned int clobCharCount = clobVal.length();
+  // maximum 4 bytes in a encoded character so the buffer is 4 times as large
+  unsigned char* lob = new unsigned char[clobCharCount * 4];
   unsigned int totalBytesRead = 0;
   oracle::occi::Stream* instream = clobVal.getStream(1, 0);
   // chunk size is set when the table is created
