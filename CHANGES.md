@@ -1,3 +1,11 @@
+2015-07-15, Version 1.6.5
+=========================
+
+ * fix initialization order of date (Vincent Schoettke)
+
+ * fixed crash when reading clobs with multi byte characters (Vincent Schoettke)
+
+
 2015-05-15, Version 1.6.4
 =========================
 
