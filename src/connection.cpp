@@ -902,13 +902,13 @@ Local<Date> OracleDateToV8Date(oracle::occi::Date* d) {
   unsigned int month, day, hour, min, sec;
   d->getDate(year, month, day, hour, min, sec);
   Local<Date> date = NanNew<Date>(0.0).As<Date>();
-  CallDateMethod(date, "setUTCMilliseconds", 0);
-  CallDateMethod(date, "setUTCSeconds", sec);
-  CallDateMethod(date, "setUTCMinutes", min);
-  CallDateMethod(date, "setUTCHours", hour);
-  CallDateMethod(date, "setUTCDate", day);
-  CallDateMethod(date, "setUTCMonth", month - 1);
   CallDateMethod(date, "setUTCFullYear", year);
+  CallDateMethod(date, "setUTCMonth", month - 1);
+  CallDateMethod(date, "setUTCDate", day);
+  CallDateMethod(date, "setUTCHours", hour);
+  CallDateMethod(date, "setUTCMinutes", min);
+  CallDateMethod(date, "setUTCSeconds", sec);
+  CallDateMethod(date, "setUTCMilliseconds", 0);
   return date;
 }
 
@@ -921,13 +921,13 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
   //occi always returns nanoseconds, regardless of precision set on timestamp column
   ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
 
-  CallDateMethod(date, "setUTCMilliseconds", ms);
-  CallDateMethod(date, "setUTCSeconds", sec);
-  CallDateMethod(date, "setUTCMinutes", min);
-  CallDateMethod(date, "setUTCHours", hour);
-  CallDateMethod(date, "setUTCDate", day);
-  CallDateMethod(date, "setUTCMonth", month - 1);
   CallDateMethod(date, "setUTCFullYear", year);
+  CallDateMethod(date, "setUTCMonth", month - 1);
+  CallDateMethod(date, "setUTCDate", day);
+  CallDateMethod(date, "setUTCHours", hour);
+  CallDateMethod(date, "setUTCMinutes", min);
+  CallDateMethod(date, "setUTCSeconds", sec);
+  CallDateMethod(date, "setUTCMilliseconds", ms);
   return date;
 }
 
