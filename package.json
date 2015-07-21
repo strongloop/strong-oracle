@@ -28,10 +28,14 @@
     "nan": "^1.8.4"
   },
   "devDependencies": {
-    "mocha": "~2.2.5",
+    "async": "^1.4.0",
+    "mocha": "~2.2.5"
+  },
+  "optionalDependencies": {
     "segfault-handler": "^0.2.4"
   },
   "scripts": {
+    "pretest": "node pretest.js",
     "test": "./node_modules/.bin/mocha -R spec --timeout 10000 test/*.js"
   },
   "main": "./index.js",

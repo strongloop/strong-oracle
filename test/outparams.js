@@ -91,7 +91,7 @@
  /
  */
 
-var settings = require('../tests-settings.json');
+var settings = require('../tests-settings');
 var oracle = require("../")(settings);
 var assert = require('assert');
 
