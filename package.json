@@ -29,7 +29,9 @@
   },
   "devDependencies": {
     "async": "^1.4.0",
-    "mocha": "~2.2.5",
+    "mocha": "~2.2.5"
+  },
+  "optionalDependencies": {
     "segfault-handler": "^0.2.4"
   },
   "scripts": {
