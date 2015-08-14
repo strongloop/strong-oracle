@@ -7,7 +7,7 @@ module.exports = {
   maxConn: 10,
   incrConn: 1,
   timeout: 10,
-  host: 'demo.strongloop.com',
+  host: 'oracle-demo.strongloop.com',
   database: 'XE',
   user: 'demo',
   password: 'L00pBack',
