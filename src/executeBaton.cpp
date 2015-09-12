@@ -23,7 +23,7 @@ ExecuteBaton::ExecuteBaton(oracle::occi::Environment* m_environment,
   this->sql = sql;
   this->outputs = new vector<output_t*>();
   this->error = NULL;
-  this->callback = callback.IsEmpty() ? NULL : new NanCallback(callback);
+  this->callback = callback.IsEmpty() ? NULL : new Nan::Callback(callback);
   CopyValuesToBaton(this, values);
   SetOptionsInBaton(this, options);
 }
@@ -44,9 +44,9 @@ ExecuteBaton::~ExecuteBaton() {
 }
 
 double CallDateMethod(v8::Local<Date> date, const char* methodName) {
-  Handle<Value> args[1]; // should be zero but on windows the compiler will not allow a zero length array
+  Handle<Value> info[1]; // should be zero but on windows the compiler will not allow a zero length array
   v8::Local<Value> result = v8::Local<v8::Function>::Cast(
-      date->Get(NanNew<String>(methodName)))->Call(date, 0, args);
+      date->Get(Nan::New<String>(methodName).ToLocalChecked()))->Call(date, 0, info);
   return v8::Local<v8::Number>::Cast(result)->Value();
 }
 
@@ -125,9 +125,9 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
 
 
     // output
-    else if (NanHasInstance(OutParam::constructorTemplate, val)) {
+    else if (Nan::New(OutParam::constructorTemplate)->HasInstance( val)) {
 
-      OutParam* op = node::ObjectWrap::Unwrap<OutParam>(val->ToObject());
+      OutParam* op = Nan::ObjectWrap::Unwrap<OutParam>(val->ToObject());
 
       // [rfeng] The OutParam object will be destroyed. We need to create a new copy.
       value->type = VALUE_TYPE_OUTPUT;
@@ -156,7 +156,7 @@ void ExecuteBaton::SetOptionsInBaton(ExecuteBaton* baton,
                                      v8::Local<v8::Object> options) {
   baton->getColumnMetaData =
     !options.IsEmpty()
-       ? options->Get(NanNew<String>("getColumnMetaData"))->BooleanValue()
+       ? options->Get(Nan::New<String>("getColumnMetaData").ToLocalChecked())->BooleanValue()
        : false;
 }
 

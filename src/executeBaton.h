@@ -91,7 +91,7 @@ public:
   bool m_autoCommit;
   // Prefetch row count
   int m_prefetchRowCount;
-  NanCallback *callback; // The JS callback function
+  Nan::Callback *callback; // The JS callback function
   std::vector<value_t*> values; // The array of parameter values
   std::string sql; // The sql statement string
   std::vector<column_t*> columns; // The list of columns

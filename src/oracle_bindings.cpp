@@ -6,12 +6,12 @@
 #include "statement.h"
 #include <iostream>
 
-Persistent<FunctionTemplate> OracleClient::s_ct;
+Nan::Persistent<FunctionTemplate> OracleClient::s_ct;
 
 // ConnectBaton implementation
 ConnectBaton::ConnectBaton(OracleClient* client,
                            oracle::occi::Environment* environment,
-                           v8::Handle<v8::Function> callback) :
+                           v8::Local<v8::Function> callback) :
     callback(callback) {
   this->client = client;
   this->environment = environment;
@@ -49,32 +49,32 @@ OracleClient::~OracleClient() {
 }
 
 void OracleClient::Init(Handle<Object> target) {
-  NanScope();
+  Nan::HandleScope scope;
 
-  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
-  NanAssignPersistent(OracleClient::s_ct, t);
+  Local<FunctionTemplate> t = Nan::New<FunctionTemplate>(New);
+  OracleClient::s_ct.Reset( t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanNew<String>("OracleClient"));
+  t->SetClassName(Nan::New<String>("OracleClient").ToLocalChecked());
 
-  NODE_SET_PROTOTYPE_METHOD(t, "connect", Connect);
-  NODE_SET_PROTOTYPE_METHOD(t, "connectSync", ConnectSync);
-  NODE_SET_PROTOTYPE_METHOD(t, "createConnectionPoolSync", CreateConnectionPoolSync);
-  NODE_SET_PROTOTYPE_METHOD(t, "createConnectionPool", CreateConnectionPool);
+  Nan::SetPrototypeMethod(t, "connect", Connect);
+  Nan::SetPrototypeMethod(t, "connectSync", ConnectSync);
+  Nan::SetPrototypeMethod(t, "createConnectionPoolSync", CreateConnectionPoolSync);
+  Nan::SetPrototypeMethod(t, "createConnectionPool", CreateConnectionPool);
 
-  target->Set(NanNew<String>("OracleClient"), t->GetFunction());
+  target->Set(Nan::New<String>("OracleClient").ToLocalChecked(), t->GetFunction());
 }
 
 NAN_METHOD(OracleClient::New) {
-  NanScope();
+  Nan::HandleScope scope;
 
   OracleClient *client = NULL;
-  if(args.Length() == 0) {
+  if(info.Length() == 0) {
     client = new OracleClient();
   } else {
     client = new OracleClient(oracle::occi::Environment::USE_LDAP);
   }
-  client->Wrap(args.This());
-  if(args.Length() > 0) {
+  client->Wrap(info.This());
+  if(info.Length() > 0) {
     REQ_OBJECT_ARG(0, ldap);
     std::string adminContext, host, user, password;
     int port;
@@ -88,17 +88,17 @@ NAN_METHOD(OracleClient::New) {
     client->getEnvironment()->setLDAPHostAndPort(host, port);
     client->getEnvironment()->setLDAPLoginNameAndPassword(user, password);
   }
-  NanReturnValue(args.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 
 NAN_METHOD(OracleClient::Connect) {
-  NanScope();
+  Nan::HandleScope scope;
 
   REQ_OBJECT_ARG(0, settings);
   REQ_FUN_ARG(1, callback);
 
-  OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
+  OracleClient* client = Nan::ObjectWrap::Unwrap<OracleClient>(info.This());
   ConnectBaton* baton = new ConnectBaton(client, client->m_environment, callback);
 
   OBJ_GET_STRING(settings, "hostname", baton->hostname);
@@ -114,7 +114,7 @@ NAN_METHOD(OracleClient::Connect) {
                 EIO_Connect,
                 (uv_after_work_cb) EIO_AfterConnect);
 
-  NanReturnUndefined();
+  return;
 }
 
 void OracleClient::EIO_Connect(uv_work_t* req) {
@@ -143,37 +143,37 @@ void OracleClient::EIO_Connect(uv_work_t* req) {
 }
 
 void OracleClient::EIO_AfterConnect(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
 
-  Handle<Value> argv[2];
+  Local<Value> argv[2];
   if(baton->error) {
-    argv[0] = Exception::Error(NanNew<String>(baton->error->c_str()));
-    argv[1] = NanUndefined();
+    argv[0] = Exception::Error(Nan::New<String>(baton->error->c_str()).ToLocalChecked());
+    argv[1] = Nan::Undefined();
   } else {
-    argv[0] = NanUndefined();
-    Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
-    Handle<Object> connection = ft->GetFunction()->NewInstance();
-    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->environment, NULL, baton->connection);
+    argv[0] = Nan::Undefined();
+    Local<FunctionTemplate> ft = Nan::New(Connection::s_ct);
+    Local<Object> connection = ft->GetFunction()->NewInstance();
+    (Nan::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton->environment, NULL, baton->connection);
     argv[1] = connection;
   }
 
-  v8::TryCatch tryCatch;
+  Nan::TryCatch tryCatch;
 
   baton->callback.Call(2, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+    Nan::FatalException(tryCatch);
   }
 }
 
 NAN_METHOD(OracleClient::ConnectSync) {
-  NanScope();
+  Nan::HandleScope scope;
 
   REQ_OBJECT_ARG(0, settings);
 
-  OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
+  OracleClient* client = Nan::ObjectWrap::Unwrap<OracleClient>(info.This());
   ConnectBaton baton(client, client->m_environment);
 
   OBJ_GET_STRING(settings, "hostname", baton.hostname);
@@ -190,26 +190,26 @@ NAN_METHOD(OracleClient::ConnectSync) {
     baton.connection = baton.environment->createConnection(baton.user, baton.password, connStr);
     baton.connection->setStmtCacheSize(baton.stmtCacheSize);
   } catch(oracle::occi::SQLException &ex) {
-    return NanThrowError(ex.getMessage().c_str());
+    return Nan::ThrowError(ex.getMessage().c_str());
   } catch (const std::exception& ex) {
-    return NanThrowError(ex.what());
+    return Nan::ThrowError(ex.what());
   }
 
-  Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
-  Handle<Object> connection = ft->GetFunction()->NewInstance();
+  Local<FunctionTemplate> ft = Nan::New(Connection::s_ct);
+  Local<Object> connection = ft->GetFunction()->NewInstance();
 
-  (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.environment, NULL, baton.connection);
+  (Nan::ObjectWrap::Unwrap<Connection>(connection))->setConnection(baton.environment, NULL, baton.connection);
 
-  NanReturnValue(connection);
+  info.GetReturnValue().Set(connection);
 
 }
 
 
 NAN_METHOD(OracleClient::CreateConnectionPoolSync) {
-  NanScope();
+  Nan::HandleScope scope;
   REQ_OBJECT_ARG(0, settings);
 
-  OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
+  OracleClient* client = Nan::ObjectWrap::Unwrap<OracleClient>(info.This());
 
   std::string hostname, user, password, database, tns;
   unsigned int port, minConn, maxConn, incrConn, timeout, busyOption, stmtCacheSize;
@@ -243,25 +243,25 @@ NAN_METHOD(OracleClient::CreateConnectionPoolSync) {
     scp->setBusyOption(static_cast<oracle::occi::StatelessConnectionPool::BusyOption>(busyOption));
     scp->setStmtCacheSize(stmtCacheSize);
 
-    Local<FunctionTemplate> ft = NanNew(ConnectionPool::s_ct);
-    Handle<Object> connectionPool = ft->GetFunction()->NewInstance();
-    (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
+    Local<FunctionTemplate> ft = Nan::New(ConnectionPool::s_ct);
+    Local<Object> connectionPool = ft->GetFunction()->NewInstance();
+    (Nan::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(client->m_environment, scp);
 
-    NanReturnValue(connectionPool);
+    info.GetReturnValue().Set(connectionPool);
   } catch(oracle::occi::SQLException &ex) {
-    return NanThrowError(ex.getMessage().c_str());
+    return Nan::ThrowError(ex.getMessage().c_str());
   } catch (const std::exception& ex) {
-    return NanThrowError(ex.what());
+    return Nan::ThrowError(ex.what());
   }
 }
 
 NAN_METHOD(OracleClient::CreateConnectionPool) {
-  NanScope();
+  Nan::HandleScope scope;
 
   REQ_OBJECT_ARG(0, settings);
   REQ_FUN_ARG(1, callback);
 
-  OracleClient* client = ObjectWrap::Unwrap<OracleClient>(args.This());
+  OracleClient* client = Nan::ObjectWrap::Unwrap<OracleClient>(info.This());
   ConnectBaton* baton = new ConnectBaton(client, client->m_environment, callback);
 
   uint32_t busyOption;
@@ -286,7 +286,7 @@ NAN_METHOD(OracleClient::CreateConnectionPool) {
                 EIO_CreateConnectionPool,
                 (uv_after_work_cb) EIO_AfterCreateConnectionPool);
 
-  NanReturnUndefined();
+  return;
 }
 
 void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
@@ -327,28 +327,28 @@ void OracleClient::EIO_CreateConnectionPool(uv_work_t* req) {
 }
 
 void OracleClient::EIO_AfterCreateConnectionPool(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ConnectBaton* baton = CONTAINER_OF(req, ConnectBaton, work_req);
 
-  Handle<Value> argv[2];
+  Local<Value> argv[2];
   if(baton->error) {
-    argv[0] = Exception::Error(NanNew<String>(baton->error->c_str()));
-    argv[1] = NanUndefined();
+    argv[0] = Exception::Error(Nan::New<String>(baton->error->c_str()).ToLocalChecked());
+    argv[1] = Nan::Undefined();
   } else {
-    argv[0] = NanUndefined();
-    Local<FunctionTemplate> ft = NanNew(ConnectionPool::s_ct);
-    Handle<Object> connectionPool = ft->GetFunction()->NewInstance();
-    (node::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(baton->client->m_environment, baton->connectionPool);
+    argv[0] = Nan::Undefined();
+    Local<FunctionTemplate> ft = Nan::New(ConnectionPool::s_ct);
+    Local<Object> connectionPool = ft->GetFunction()->NewInstance();
+    (Nan::ObjectWrap::Unwrap<ConnectionPool>(connectionPool))->setConnectionPool(baton->client->m_environment, baton->connectionPool);
     argv[1] = connectionPool;
   }
 
-  v8::TryCatch tryCatch;
+  Nan::TryCatch tryCatch;
 
   baton->callback.Call(2, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+    Nan::FatalException(tryCatch);
   }
 }
 

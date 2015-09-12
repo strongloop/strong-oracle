@@ -36,7 +36,7 @@ using namespace v8;
  * ...
  * }
  */
-class OracleClient: public ObjectWrap {
+class OracleClient: public Nan::ObjectWrap {
 public:
   /**
    * Define OracleClient class
@@ -79,7 +79,7 @@ public:
   }
 
 private:
-  static Persistent<FunctionTemplate> s_ct;
+  static Nan::Persistent<FunctionTemplate> s_ct;
   oracle::occi::Environment* m_environment;
   // oracle::occi::StatelessConnectionPool* m_connectionPool;
 };
@@ -91,7 +91,7 @@ class ConnectBaton {
 public:
   ConnectBaton(OracleClient* client,
                oracle::occi::Environment* environment,
-               v8::Handle<v8::Function> callback = v8::Handle<v8::Function>());
+               v8::Local<v8::Function> callback = v8::Local<v8::Function>());
   ~ConnectBaton();
 
   /**
@@ -102,7 +102,7 @@ public:
   /**
    * The callback function
    */
-  NanCallback callback;
+  Nan::Callback callback;
 
   /**
    * host name or ip address for the DB server

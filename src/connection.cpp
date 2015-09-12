@@ -10,8 +10,8 @@
 #include <iostream>
 using namespace std;
 
-Persistent<FunctionTemplate> ConnectionPool::s_ct;
-Persistent<FunctionTemplate> Connection::s_ct;
+Nan::Persistent<FunctionTemplate> ConnectionPool::s_ct;
+Nan::Persistent<FunctionTemplate> Connection::s_ct;
 
 // ConnectionPool implementation
 ConnectionPool::ConnectionPool() :
@@ -30,30 +30,30 @@ ConnectionPool::~ConnectionPool() {
 }
 
 void ConnectionPool::Init(Handle<Object> target) {
-  NanScope();
+  Nan::HandleScope scope;
 
-  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(ConnectionPool::New);
-  NanAssignPersistent(ConnectionPool::s_ct, t);
+  Local<FunctionTemplate> t = Nan::New<FunctionTemplate>(ConnectionPool::New);
+  ConnectionPool::s_ct.Reset( t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanNew<String>("ConnectionPool"));
+  t->SetClassName(Nan::New<String>("ConnectionPool").ToLocalChecked());
 
-  NODE_SET_PROTOTYPE_METHOD(t, "getConnectionSync", ConnectionPool::GetConnectionSync);
-  NODE_SET_PROTOTYPE_METHOD(t, "getConnection", ConnectionPool::GetConnection);
-  NODE_SET_PROTOTYPE_METHOD(t, "execute", ConnectionPool::Execute);
-  NODE_SET_PROTOTYPE_METHOD(t, "close", ConnectionPool::Close);
-  NODE_SET_PROTOTYPE_METHOD(t, "closeSync", ConnectionPool::CloseSync);
-  NODE_SET_PROTOTYPE_METHOD(t, "getInfo", ConnectionPool::GetInfo);
+  Nan::SetPrototypeMethod(t, "getConnectionSync", ConnectionPool::GetConnectionSync);
+  Nan::SetPrototypeMethod(t, "getConnection", ConnectionPool::GetConnection);
+  Nan::SetPrototypeMethod(t, "execute", ConnectionPool::Execute);
+  Nan::SetPrototypeMethod(t, "close", ConnectionPool::Close);
+  Nan::SetPrototypeMethod(t, "closeSync", ConnectionPool::CloseSync);
+  Nan::SetPrototypeMethod(t, "getInfo", ConnectionPool::GetInfo);
 
-  target->Set(NanNew<String>("ConnectionPool"), t->GetFunction());
+  target->Set(Nan::New<String>("ConnectionPool").ToLocalChecked(), t->GetFunction());
 }
 
 NAN_METHOD(ConnectionPool::New) {
-  NanScope();
+  Nan::HandleScope scope;
 
   ConnectionPool *connectionPool = new ConnectionPool();
-  connectionPool->Wrap(args.This());
-  NanReturnValue(args.This());
+  connectionPool->Wrap(info.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment,
@@ -63,46 +63,46 @@ void ConnectionPool::setConnectionPool(oracle::occi::Environment* environment,
 }
 
 NAN_METHOD(ConnectionPool::CloseSync) {
-  NanScope();
+  Nan::HandleScope scope;
   try {
-    ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
-        args.This());
+    ConnectionPool* connectionPool = Nan::ObjectWrap::Unwrap<ConnectionPool>(
+        info.This());
 
     // Get the optional destroy mode
     oracle::occi::StatelessConnectionPool::DestroyMode mode =
         oracle::occi::StatelessConnectionPool::DEFAULT;
-    if (args.Length() == 1 || args[0]->IsUint32()) {
+    if (info.Length() == 1 || info[0]->IsUint32()) {
       mode =
-          static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(args[0]->Uint32Value());
+          static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(info[0]->Uint32Value());
     }
 
     connectionPool->closeConnectionPool(mode);
     connectionPool->Unref();
 
-    NanReturnUndefined();
+    return;
   } catch (const exception& ex) {
-    return NanThrowError(ex.what());
+    return Nan::ThrowError(ex.what());
   }
 }
 
 NAN_METHOD(ConnectionPool::Close) {
-  NanScope();
-  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
-        args.This());
+  Nan::HandleScope scope;
+  ConnectionPool* connectionPool = Nan::ObjectWrap::Unwrap<ConnectionPool>(
+        info.This());
 
   // Get the optional destroy mode
   oracle::occi::StatelessConnectionPool::DestroyMode mode =
       oracle::occi::StatelessConnectionPool::DEFAULT;
-  if (args.Length() >= 1 && args[0]->IsUint32()) {
+  if (info.Length() >= 1 && info[0]->IsUint32()) {
     mode =
-        static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(args[0]->Uint32Value());
+        static_cast<oracle::occi::StatelessConnectionPool::DestroyMode>(info[0]->Uint32Value());
   }
 
   Local<Function> callback;
-  if (args.Length() == 1 && args[0]->IsFunction()) {
-    callback = Local<Function>::Cast(args[0]);
-  } else if (args.Length() > 1 && args[1]->IsFunction()) {
-    callback = Local<Function>::Cast(args[1]);
+  if (info.Length() == 1 && info[0]->IsFunction()) {
+    callback = Local<Function>::Cast(info[0]);
+  } else if (info.Length() > 1 && info[1]->IsFunction()) {
+    callback = Local<Function>::Cast(info[1]);
   }
 
   ConnectionPoolBaton* baton =
@@ -115,7 +115,7 @@ NAN_METHOD(ConnectionPool::Close) {
                 ConnectionPool::EIO_Close,
                 (uv_after_work_cb) ConnectionPool::EIO_AfterClose);
 
-  NanReturnUndefined();
+  return;
 }
 
 void ConnectionPool::EIO_Close(uv_work_t* req) {
@@ -129,84 +129,84 @@ void ConnectionPool::EIO_Close(uv_work_t* req) {
 }
 
 void ConnectionPool::EIO_AfterClose(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
   baton->connectionPool->Unref();
 
-  v8::TryCatch tryCatch;
+  Nan::TryCatch tryCatch;
   if (baton->callback != NULL) {
-    Handle<Value> argv[2];
+    Local<Value> argv[2];
     if (baton->error) {
-      argv[0] = NanError(baton->error->c_str());
-      argv[1] = NanUndefined();
+      argv[0] = Nan::Error(baton->error->c_str());
+      argv[1] = Nan::Undefined();
     } else {
-      argv[0] = NanUndefined();
-      argv[1] = NanUndefined();
+      argv[0] = Nan::Undefined();
+      argv[1] = Nan::Undefined();
     }
     baton->callback->Call(2, argv);
   }
   delete baton;
 
   if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+    Nan::FatalException(tryCatch);
   }
 }
 
 NAN_METHOD(ConnectionPool::GetInfo) {
-  NanScope();
-  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
-      args.This());
+  Nan::HandleScope scope;
+  ConnectionPool* connectionPool = Nan::ObjectWrap::Unwrap<ConnectionPool>(
+      info.This());
   if (connectionPool->m_connectionPool) {
-    Local<Object> obj = NanNew<Object>();
+    Local<Object> obj = Nan::New<Object>();
 
-    obj->Set(NanNew<String>("openConnections"),
-        NanNew<Uint32>(connectionPool->m_connectionPool->getOpenConnections()));
-    obj->Set(NanNew<String>("busyConnections"),
-        NanNew<Uint32>(connectionPool->m_connectionPool->getBusyConnections()));
-    obj->Set(NanNew<String>("maxConnections"),
-        NanNew<Uint32>(connectionPool->m_connectionPool->getMaxConnections()));
-    obj->Set(NanNew<String>("minConnections"),
-        NanNew<Uint32>(connectionPool->m_connectionPool->getMinConnections()));
-    obj->Set(NanNew<String>("incrConnections"),
-        NanNew<Uint32>(connectionPool->m_connectionPool->getIncrConnections()));
-    obj->Set(NanNew<String>("busyOption"),
-        NanNew<Uint32>(static_cast<unsigned int>(connectionPool->m_connectionPool->getBusyOption())));
-    obj->Set(NanNew<String>("timeout"),
-        NanNew<Uint32>(connectionPool->m_connectionPool->getTimeOut()));
+    obj->Set(Nan::New<String>("openConnections").ToLocalChecked(),
+        Nan::New<Uint32>(connectionPool->m_connectionPool->getOpenConnections()));
+    obj->Set(Nan::New<String>("busyConnections").ToLocalChecked(),
+        Nan::New<Uint32>(connectionPool->m_connectionPool->getBusyConnections()));
+    obj->Set(Nan::New<String>("maxConnections").ToLocalChecked(),
+        Nan::New<Uint32>(connectionPool->m_connectionPool->getMaxConnections()));
+    obj->Set(Nan::New<String>("minConnections").ToLocalChecked(),
+        Nan::New<Uint32>(connectionPool->m_connectionPool->getMinConnections()));
+    obj->Set(Nan::New<String>("incrConnections").ToLocalChecked(),
+        Nan::New<Uint32>(connectionPool->m_connectionPool->getIncrConnections()));
+    obj->Set(Nan::New<String>("busyOption").ToLocalChecked(),
+        Nan::New<Uint32>(static_cast<unsigned int>(connectionPool->m_connectionPool->getBusyOption())));
+    obj->Set(Nan::New<String>("timeout").ToLocalChecked(),
+        Nan::New<Uint32>(connectionPool->m_connectionPool->getTimeOut()));
 
-    obj->Set(NanNew<String>("poolName"),
-        NanNew<String>(connectionPool->m_connectionPool->getPoolName().c_str()));
+    obj->Set(Nan::New<String>("poolName").ToLocalChecked(),
+        Nan::New<String>(connectionPool->m_connectionPool->getPoolName().c_str()).ToLocalChecked());
 
-    NanReturnValue(obj);
+    info.GetReturnValue().Set(obj);
   } else {
-    NanReturnUndefined();
+    return;
   }
 }
 
 NAN_METHOD(ConnectionPool::GetConnectionSync) {
-  NanScope();
+  Nan::HandleScope scope;
   try {
-    ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
-        args.This());
+    ConnectionPool* connectionPool = Nan::ObjectWrap::Unwrap<ConnectionPool>(
+        info.This());
     // std::string tag = "strong-oracle";
     oracle::occi::Connection *conn =
         connectionPool->getConnectionPool()->getConnection("strong-oracle");
-    Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
-    Handle<Object> connection = ft->GetFunction()->NewInstance();
-    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
+    Local<FunctionTemplate> ft = Nan::New(Connection::s_ct);
+    Local<Object> connection = ft->GetFunction()->NewInstance();
+    (Nan::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
         connectionPool->getEnvironment(),
         connectionPool,
         conn);
-    NanReturnValue(connection);
+    info.GetReturnValue().Set(connection);
   } catch (const exception& ex) {
-    return NanThrowError(ex.what());
+    return Nan::ThrowError(ex.what());
   }
 }
 
 NAN_METHOD(ConnectionPool::GetConnection) {
-  NanScope();
-  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(
-      args.This());
+  Nan::HandleScope scope;
+  ConnectionPool* connectionPool = Nan::ObjectWrap::Unwrap<ConnectionPool>(
+      info.This());
 
   REQ_FUN_ARG(0, callback);
 
@@ -220,7 +220,7 @@ NAN_METHOD(ConnectionPool::GetConnection) {
                 ConnectionPool::EIO_GetConnection,
                 (uv_after_work_cb) ConnectionPool::EIO_AfterGetConnection);
 
-  NanReturnUndefined();
+  return;
 }
 
 void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
@@ -237,30 +237,30 @@ void ConnectionPool::EIO_GetConnection(uv_work_t* req) {
 }
 
 void ConnectionPool::EIO_AfterGetConnection(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ConnectionPoolBaton* baton = CONTAINER_OF(req, ConnectionPoolBaton, work_req);
 
-  Handle<Value> argv[2];
+  Local<Value> argv[2];
   if (baton->error) {
-    argv[0] = NanError(baton->error->c_str());
-    argv[1] = NanUndefined();
+    argv[0] = Nan::Error(baton->error->c_str());
+    argv[1] = Nan::Undefined();
   } else {
-    argv[0] = NanUndefined();
-    Local<FunctionTemplate> ft = NanNew(Connection::s_ct);
-    Handle<Object> connection = ft->GetFunction()->NewInstance();
-    (node::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
+    argv[0] = Nan::Undefined();
+    Local<FunctionTemplate> ft = Nan::New(Connection::s_ct);
+    Local<Object> connection = ft->GetFunction()->NewInstance();
+    (Nan::ObjectWrap::Unwrap<Connection>(connection))->setConnection(
         baton->connectionPool->getEnvironment(),
         baton->connectionPool,
         baton->connection);
     argv[1] = connection;
   }
 
-  v8::TryCatch tryCatch;
+  Nan::TryCatch tryCatch;
   baton->callback->Call(2, argv);
   delete baton;
 
   if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+    Nan::FatalException(tryCatch);
   }
 
 }
@@ -274,26 +274,26 @@ void ConnectionPool::closeConnectionPool(
 }
 
 NAN_METHOD(ConnectionPool::Execute) {
-  NanScope();
-  ConnectionPool* connectionPool = ObjectWrap::Unwrap<ConnectionPool>(args.This());
+  Nan::HandleScope scope;
+  ConnectionPool* connectionPool = Nan::ObjectWrap::Unwrap<ConnectionPool>(info.This());
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
   Local<Object> options;
   int cbIndex = 2;
-  if (args.Length() > 3 && args[2]->IsObject() && !args[2]->IsFunction())
+  if (info.Length() > 3 && info[2]->IsObject() && !info[2]->IsFunction())
   {
-    options = Local<Object>::Cast(args[2]);
+    options = Local<Object>::Cast(info[2]);
     ++cbIndex;
   }
-  if (args.Length() <= cbIndex || !args[cbIndex]->IsFunction())
+  if (info.Length() <= cbIndex || !info[cbIndex]->IsFunction())
   {
     ostringstream oss;
     oss << "Argument " << cbIndex << " must be a function";
     std::string strMsg = std::string(oss.str().c_str());
     throw NodeOracleException(strMsg);
   }
-  Local<Function> callback = Local<Function>::Cast(args[cbIndex]);
+  Local<Function> callback = Local<Function>::Cast(info[cbIndex]);
 
   String::Utf8Value sqlVal(sql);
 
@@ -309,7 +309,7 @@ NAN_METHOD(ConnectionPool::Execute) {
                 ConnectionPool::EIO_Execute,
                 (uv_after_work_cb) ConnectionPool::EIO_AfterExecute);
 
-  NanReturnUndefined();
+  return;
 }
 
 void ConnectionPool::EIO_Execute(uv_work_t* req) {
@@ -339,22 +339,22 @@ void ConnectionPool::EIO_Execute(uv_work_t* req) {
 }
 
 void ConnectionPool::EIO_AfterExecute(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
 
   try {
-    Handle<Value> argv[2];
+    Local<Value> argv[2];
     Connection::handleResult(baton, argv);
     baton->callback->Call(2, argv);
   } catch (NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = NanError(ex.getMessage().c_str());
-    argv[1] = NanUndefined();
+    Local<Value> argv[2];
+    argv[0] = Nan::Error(ex.getMessage().c_str());
+    argv[1] = Nan::Undefined();
     baton->callback->Call(2, argv);
   } catch (const exception &ex) {
-    Handle<Value> argv[2];
-    argv[0] = NanError(ex.what());
-    argv[1] = NanUndefined();
+    Local<Value> argv[2];
+    argv[0] = Nan::Error(ex.what());
+    argv[1] = Nan::Undefined();
     baton->callback->Call(2, argv);
   }
 
@@ -362,40 +362,40 @@ void ConnectionPool::EIO_AfterExecute(uv_work_t* req) {
 }
 
 void Connection::Init(Handle<Object> target) {
-  NanScope();
+  Nan::HandleScope scope;
 
-  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(Connection::New);
-  NanAssignPersistent(Connection::s_ct, t);
+  Local<FunctionTemplate> t = Nan::New<FunctionTemplate>(Connection::New);
+  Connection::s_ct.Reset( t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanNew<String>("Connection"));
+  t->SetClassName(Nan::New<String>("Connection").ToLocalChecked());
 
-  NODE_SET_PROTOTYPE_METHOD(t, "execute", Connection::Execute);
-  NODE_SET_PROTOTYPE_METHOD(t, "executeSync", ExecuteSync);
-  NODE_SET_PROTOTYPE_METHOD(t, "readerHandle", CreateReader);
-  NODE_SET_PROTOTYPE_METHOD(t, "prepare", Prepare);
-  NODE_SET_PROTOTYPE_METHOD(t, "close", Connection::Close);
-  NODE_SET_PROTOTYPE_METHOD(t, "closeSync", Connection::CloseSync);
-  NODE_SET_PROTOTYPE_METHOD(t, "isConnected", IsConnected);
-  NODE_SET_PROTOTYPE_METHOD(t, "setAutoCommit", SetAutoCommit);
-  NODE_SET_PROTOTYPE_METHOD(t, "setPrefetchRowCount", SetPrefetchRowCount);
-  NODE_SET_PROTOTYPE_METHOD(t, "commit", Commit);
-  NODE_SET_PROTOTYPE_METHOD(t, "rollback", Rollback);
+  Nan::SetPrototypeMethod(t, "execute", Connection::Execute);
+  Nan::SetPrototypeMethod(t, "executeSync", ExecuteSync);
+  Nan::SetPrototypeMethod(t, "readerHandle", CreateReader);
+  Nan::SetPrototypeMethod(t, "prepare", Prepare);
+  Nan::SetPrototypeMethod(t, "close", Connection::Close);
+  Nan::SetPrototypeMethod(t, "closeSync", Connection::CloseSync);
+  Nan::SetPrototypeMethod(t, "isConnected", IsConnected);
+  Nan::SetPrototypeMethod(t, "setAutoCommit", SetAutoCommit);
+  Nan::SetPrototypeMethod(t, "setPrefetchRowCount", SetPrefetchRowCount);
+  Nan::SetPrototypeMethod(t, "commit", Commit);
+  Nan::SetPrototypeMethod(t, "rollback", Rollback);
 
-  target->Set(NanNew<String>("Connection"), t->GetFunction());
+  target->Set(Nan::New<String>("Connection").ToLocalChecked(), t->GetFunction());
 }
 
 NAN_METHOD(Connection::New) {
-  NanScope();
+  Nan::HandleScope scope;
 
   Connection *connection = new Connection();
-  connection->Wrap(args.This());
-  NanReturnValue(args.This());
+  connection->Wrap(info.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 NAN_METHOD(Connection::Prepare) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   REQ_STRING_ARG(0, sql);
 
@@ -404,17 +404,17 @@ NAN_METHOD(Connection::Prepare) {
   StatementBaton* baton = new StatementBaton(connection->m_environment, NULL, connection->m_connection,
       connection->getAutoCommit(), connection->getPrefetchRowCount(),
       *sqlVal);
-  Local<FunctionTemplate> ft = NanNew(Statement::s_ct);
-  Handle<Object> statementHandle = ft->GetFunction()->NewInstance();
-  Statement* statement = ObjectWrap::Unwrap<Statement>(statementHandle);
+  Local<FunctionTemplate> ft = Nan::New(Statement::s_ct);
+  Local<Object> statementHandle = ft->GetFunction()->NewInstance();
+  Statement* statement = Nan::ObjectWrap::Unwrap<Statement>(statementHandle);
   statement->setBaton(baton);
 
-  NanReturnValue(statementHandle);
+  info.GetReturnValue().Set(statementHandle);
 }
 
 NAN_METHOD(Connection::CreateReader) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
@@ -425,12 +425,12 @@ NAN_METHOD(Connection::CreateReader) {
       connection->getAutoCommit(), connection->getPrefetchRowCount(),
       *sqlVal, values);
 
-  Local<FunctionTemplate> ft = NanNew(Reader::s_ct);
+  Local<FunctionTemplate> ft = Nan::New(Reader::s_ct);
   Local<Object> readerHandle = ft->GetFunction()->NewInstance();
-  Reader* reader = ObjectWrap::Unwrap<Reader>(readerHandle);
+  Reader* reader = Nan::ObjectWrap::Unwrap<Reader>(readerHandle);
   reader->setBaton(baton);
 
-  NanReturnValue(readerHandle);
+  info.GetReturnValue().Set(readerHandle);
 }
 
 Connection::Connection() :
@@ -450,26 +450,26 @@ Connection::~Connection() {
 }
 
 NAN_METHOD(Connection::Execute) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
   Local<Object> options;
   int cbIndex = 2;
-  if (args.Length() > 3 && args[2]->IsObject() && !args[2]->IsFunction())
+  if (info.Length() > 3 && info[2]->IsObject() && !info[2]->IsFunction())
   {
-    options = Local<Object>::Cast(args[2]);
+    options = Local<Object>::Cast(info[2]);
     ++cbIndex;
   }
-  if (args.Length() <= cbIndex || !args[cbIndex]->IsFunction())
+  if (info.Length() <= cbIndex || !info[cbIndex]->IsFunction())
   {
     ostringstream oss;
     oss << "Argument " << cbIndex << " must be a function";
     std::string strMsg = std::string(oss.str().c_str());
     throw NodeOracleException(strMsg);
   }
-  Local<Function> callback = Local<Function>::Cast(args[cbIndex]);
+  Local<Function> callback = Local<Function>::Cast(info[cbIndex]);
 
   String::Utf8Value sqlVal(sql);
 
@@ -485,36 +485,36 @@ NAN_METHOD(Connection::Execute) {
                 EIO_Execute,
                 (uv_after_work_cb) EIO_AfterExecute);
 
-  NanReturnUndefined();
+  return;
 }
 
 NAN_METHOD(Connection::CloseSync) {
-  NanScope();
+  Nan::HandleScope scope;
   try {
-    Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+    Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
     connection->closeConnection();
     connection->Unref();
 
-    NanReturnUndefined();
+    return;
   } catch (const exception& ex) {
-    return NanThrowError(ex.what());
+    return Nan::ThrowError(ex.what());
   }
 }
 
 NAN_METHOD(Connection::IsConnected) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   if (connection && connection->m_connection) {
-    NanReturnValue(NanNew<Boolean>(true));
+    info.GetReturnValue().Set(Nan::New<Boolean>(true));
   } else {
-    NanReturnValue(NanNew<Boolean>(false));
+    info.GetReturnValue().Set(Nan::New<Boolean>(false));
   }
 }
 
 NAN_METHOD(Connection::Commit) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   REQ_FUN_ARG(0, callback);
 
@@ -524,12 +524,12 @@ NAN_METHOD(Connection::Commit) {
                 EIO_Commit,
                 (uv_after_work_cb) EIO_AfterCommit);
 
-  NanReturnUndefined();
+  return;
 }
 
 NAN_METHOD(Connection::Rollback) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   REQ_FUN_ARG(0, callback);
 
@@ -539,23 +539,23 @@ NAN_METHOD(Connection::Rollback) {
                 EIO_Rollback,
                 (uv_after_work_cb) EIO_AfterRollback);
 
-  NanReturnUndefined();
+  return;
 }
 
 NAN_METHOD(Connection::SetAutoCommit) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
   REQ_BOOL_ARG(0, autoCommit);
   connection->m_autoCommit = autoCommit;
-  NanReturnUndefined();
+  return;
 }
 
 NAN_METHOD(Connection::SetPrefetchRowCount) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
   REQ_INT_ARG(0, prefetchRowCount);
   connection->m_prefetchRowCount = prefetchRowCount;
-  NanReturnUndefined();
+  return;
 }
 
 void Connection::closeConnection() {
@@ -782,25 +782,25 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
 }
 
 void Connection::EIO_AfterCall(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
 
-  v8::TryCatch tryCatch;
+  Nan::TryCatch tryCatch;
   if (baton->callback != NULL) {
-    Handle<Value> argv[2];
+    Local<Value> argv[2];
     if (baton->error) {
-      argv[0] = NanError(baton->error->c_str());
-      argv[1] = NanUndefined();
+      argv[0] = Nan::Error(baton->error->c_str());
+      argv[1] = Nan::Undefined();
     } else {
-      argv[0] = NanUndefined();
-      argv[1] = NanUndefined();
+      argv[0] = Nan::Undefined();
+      argv[1] = Nan::Undefined();
     }
     baton->callback->Call(2, argv);
   }
   delete baton;
 
   if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+    Nan::FatalException(tryCatch);
   }
 }
 
@@ -825,12 +825,12 @@ void Connection::EIO_AfterRollback(uv_work_t* req) {
 }
 
 NAN_METHOD(Connection::Close) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   Local<Function> callback;
-  if (args.Length() > 0 && args[0]->IsFunction()) {
-    callback = Local<Function>::Cast(args[0]);
+  if (info.Length() > 0 && info[0]->IsFunction()) {
+    callback = Local<Function>::Cast(info[0]);
   }
 
   ConnectionBaton* baton = new ConnectionBaton(connection, callback);
@@ -839,7 +839,7 @@ NAN_METHOD(Connection::Close) {
                 Connection::EIO_Close,
                 (uv_after_work_cb) Connection::EIO_AfterClose);
 
-  NanReturnUndefined();
+  return;
 }
 
 void Connection::EIO_Close(uv_work_t* req) {
@@ -852,25 +852,25 @@ void Connection::EIO_Close(uv_work_t* req) {
 }
 
 void Connection::EIO_AfterClose(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ConnectionBaton* baton = CONTAINER_OF(req, ConnectionBaton, work_req);
   baton->connection->Unref();
-  v8::TryCatch tryCatch;
+  Nan::TryCatch tryCatch;
   if (baton->callback != NULL) {
-    Handle<Value> argv[2];
+    Local<Value> argv[2];
     if (baton->error) {
-      argv[0] = NanError(baton->error->c_str());
-      argv[1] = NanUndefined();
+      argv[0] = Nan::Error(baton->error->c_str());
+      argv[1] = Nan::Undefined();
     } else {
-      argv[0] = NanUndefined();
-      argv[1] = NanUndefined();
+      argv[0] = Nan::Undefined();
+      argv[1] = Nan::Undefined();
     }
     baton->callback->Call(2, argv);
   }
   delete baton;
 
   if (tryCatch.HasCaught()) {
-    node::FatalException(tryCatch);
+    Nan::FatalException(tryCatch);
   }
 }
 
@@ -891,17 +891,17 @@ void Connection::EIO_Execute(uv_work_t* req) {
 }
 
 void CallDateMethod(v8::Local<v8::Date> date, const char* methodName, int val) {
-  Handle<Value> args[1];
-  args[0] = NanNew<Number>(val);
-  Local<Function>::Cast(date->Get(NanNew<String>(methodName)))->Call(date, 1,
-      args);
+  Local<Value> info[1];
+  info[0] = Nan::New<Number>(val);
+  Local<Function>::Cast(date->Get(Nan::New<String>(methodName).ToLocalChecked()))->Call(date, 1,
+      info);
 }
 
 Local<Date> OracleDateToV8Date(oracle::occi::Date* d) {
   int year;
   unsigned int month, day, hour, min, sec;
   d->getDate(year, month, day, hour, min, sec);
-  Local<Date> date = NanNew<Date>(0.0).As<Date>();
+  Local<Date> date = Nan::New<Date>(static_cast<double>(time(NULL))).ToLocalChecked();
   CallDateMethod(date, "setUTCFullYear", year);
   CallDateMethod(date, "setUTCMonth", month - 1);
   CallDateMethod(date, "setUTCDate", day);
@@ -917,7 +917,7 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
   unsigned int month, day, hour, min, sec, fs, ms;
   d->getDate(year, month, day);
   d->getTime(hour, min, sec, fs);
-  Local<Date> date = NanNew<Date>(0.0).As<Date>();
+  Local<Date> date = Nan::New<Date>(static_cast<double>(time(NULL))).ToLocalChecked();
   //occi always returns nanoseconds, regardless of precision set on timestamp column
   ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
 
@@ -933,43 +933,43 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
 
 Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
     row_t* currentRow) {
-  Local<Object> obj = NanNew<Object>();
+  Local<Object> obj = Nan::New<Object>();
   uint32_t colIndex = 0;
   for (vector<column_t*>::iterator iterator = columns.begin(), end =
       columns.end(); iterator != end; ++iterator, colIndex++) {
     column_t* col = *iterator;
     void* val = currentRow->values[colIndex];
     if (val == NULL) {
-      obj->Set(NanNew<String>(col->name.c_str()), NanNull());
+      obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::Null());
     } else {
       switch (col->type) {
       case VALUE_TYPE_STRING: {
         string* v = (string*) val;
-        obj->Set(NanNew<String>(col->name.c_str()), NanNew<String>(v->c_str()));
+        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::New<String>(v->c_str()).ToLocalChecked());
         delete v;
       }
         break;
       case VALUE_TYPE_NUMBER: {
         oracle::occi::Number* v = (oracle::occi::Number*) val;
-        obj->Set(NanNew<String>(col->name.c_str()), NanNew<Number>((double) (*v)));
+        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::New<Number>((double) (*v)));
         delete v;
       }
         break;
       case VALUE_TYPE_DATE: {
         oracle::occi::Date* v = (oracle::occi::Date*) val;
-        obj->Set(NanNew<String>(col->name.c_str()), OracleDateToV8Date(v));
+        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), OracleDateToV8Date(v));
         delete v;
       }
         break;
       case VALUE_TYPE_TIMESTAMP: {
         oracle::occi::Timestamp* v = (oracle::occi::Timestamp*) val;
-        obj->Set(NanNew<String>(col->name.c_str()), OracleTimestampToV8Date(v));
+        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), OracleTimestampToV8Date(v));
         delete v;
       }
         break;
       case VALUE_TYPE_CLOB: {
         buffer_t *v = (buffer_t *) val;
-        obj->Set(NanNew<String>(col->name.c_str()), NanNew<String>((const char*)v->data, v->length));
+        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::New<String>((const char*)v->data, v->length).ToLocalChecked());
         delete[] v->data;
         delete v;
       }
@@ -977,8 +977,8 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
       case VALUE_TYPE_BLOB: {
         buffer_t *v = (buffer_t *) val;
         // convert to V8 buffer
-        v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)v->data, (uint32_t)v->length);
-        obj->Set(NanNew<String>(col->name.c_str()), v8Buffer);
+        v8::Local<v8::Object> v8Buffer = Nan::NewBuffer((char *)v->data, (uint32_t)v->length).ToLocalChecked();
+        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), v8Buffer);
         // Nan will free the memory of the buffer
         delete v;
         break;
@@ -1000,7 +1000,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
 Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns,
     vector<row_t*>* rows) {
   size_t totalRows = rows->size();
-  Local<Array> retRows = NanNew<Array>(totalRows);
+  Local<Array> retRows = Nan::New<Array>(totalRows);
   uint32_t index = 0;
   for (vector<row_t*>::iterator iterator = rows->begin(), end = rows->end();
       iterator != end; ++iterator, index++) {
@@ -1013,59 +1013,59 @@ Local<Array> Connection::CreateV8ArrayFromRows(vector<column_t*> columns,
 
 Local<Array> Connection::CreateV8ArrayFromCols(std::vector<column_t*> columns)
 {
-  Local<Array> v8cols = NanNew<Array>(columns.size());
+  Local<Array> v8cols = Nan::New<Array>(columns.size());
   uint32_t index = 0;
   for (std::vector<column_t*>::iterator iterator = columns.begin(), end =columns.end(); iterator != end; ++iterator, ++index)
   {
      column_t* col = *iterator;
-     Local<Object> v8col = NanNew<Object>();
-     v8col->Set(NanNew<String>("name"), NanNew<String>(col->name.c_str()));
-     v8col->Set(NanNew<String>("type"), NanNew<Number>((double)(col->type)));
+     Local<Object> v8col = Nan::New<Object>();
+     v8col->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(col->name.c_str()).ToLocalChecked());
+     v8col->Set(Nan::New<String>("type").ToLocalChecked(), Nan::New<Number>((double)(col->type)));
      v8cols->Set(index, v8col);
   }
   return v8cols;
 }
 
 void Connection::EIO_AfterExecute(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   ExecuteBaton* baton = CONTAINER_OF(req, ExecuteBaton, work_req);
 
   try {
-    Handle<Value> argv[2];
+    Local<Value> argv[2];
     handleResult(baton, argv);
     baton->callback->Call(2, argv);
   } catch (NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = NanError(ex.getMessage().c_str());
-    argv[1] = NanUndefined();
+    Local<Value> argv[2];
+    argv[0] = Nan::Error(ex.getMessage().c_str());
+    argv[1] = Nan::Undefined();
     baton->callback->Call(2, argv);
   } catch (const exception &ex) {
-    Handle<Value> argv[2];
-    argv[0] = NanError(ex.what());
-    argv[1] = NanUndefined();
+    Local<Value> argv[2];
+    argv[0] = Nan::Error(ex.what());
+    argv[1] = Nan::Undefined();
     baton->callback->Call(2, argv);
   }
 
   delete baton;
 }
 
-void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
+void Connection::handleResult(ExecuteBaton* baton, Local<Value> (&argv)[2]) {
   try {
     if (baton->error) {
-      argv[0] = NanError(baton->error->c_str());
-      argv[1] = NanUndefined();
+      argv[0] = Nan::Error(baton->error->c_str());
+      argv[1] = Nan::Undefined();
     } else {
-      argv[0] = NanUndefined();
+      argv[0] = Nan::Undefined();
       if (baton->rows) {
         Local<Object> obj = CreateV8ArrayFromRows(baton->columns, baton->rows);
         if (baton->getColumnMetaData) {
-          obj->Set(NanNew<String>("columnMetaData"),
+          obj->Set(Nan::New<String>("columnMetaData").ToLocalChecked(),
                    CreateV8ArrayFromCols(baton->columns));
         }
         argv[1] = obj;
       } else {
-        Local<Object> obj = NanNew<Object>();
-        obj->Set(NanNew<String>("updateCount"), NanNew<Integer>(baton->updateCount));
+        Local<Object> obj = Nan::New<Object>();
+        obj->Set(Nan::New<String>("updateCount").ToLocalChecked(), Nan::New<Integer>(baton->updateCount));
 
         /* Note: attempt to keep backward compatability here: existing users of this library will have code that expects a single out param
          called 'returnParam'. For multiple out params, the first output will continue to be called 'returnParam' and subsequent outputs
@@ -1082,32 +1082,32 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             snprintf(msg, sizeof(msg), "returnParam");
           }
           std::string returnParam(msg);
-          Local<String> prop = NanNew<String>(returnParam.c_str());
+          Local<String> prop = Nan::New<String>(returnParam.c_str()).ToLocalChecked();
           switch (output->type) {
           case OutParam::OCCIINT:
-            obj->Set(prop, NanNew<Integer>(output->intVal));
+            obj->Set(prop, Nan::New<Integer>(output->intVal));
             break;
           case OutParam::OCCISTRING:
-            obj->Set(prop, NanNew<String>(output->strVal.c_str()));
+            obj->Set(prop, Nan::New<String>(output->strVal.c_str()).ToLocalChecked());
             break;
           case OutParam::OCCIDOUBLE:
-            obj->Set(prop, NanNew<Number>(output->doubleVal));
+            obj->Set(prop, Nan::New<Number>(output->doubleVal));
             break;
           case OutParam::OCCIFLOAT:
-            obj->Set(prop, NanNew<Number>(output->floatVal));
+            obj->Set(prop, Nan::New<Number>(output->floatVal));
             break;
           case OutParam::OCCICURSOR:
             obj->Set(prop,
                 CreateV8ArrayFromRows(output->columns, output->rows));
             break;
           case OutParam::OCCICLOB: {
-            obj->Set(prop, NanNew<String>((const char *)output->bufVal, output->bufLength));
+            obj->Set(prop, Nan::New<String>((const char *)output->bufVal, output->bufLength).ToLocalChecked());
             delete[] output->bufVal;
             break;
           }
           case OutParam::OCCIBLOB: {
             // convert to V8 buffer
-            v8::Local<v8::Object> v8Buffer = NanBufferUse((char *)output->bufVal, output->bufLength);
+            v8::Local<v8::Object> v8Buffer = Nan::NewBuffer((char *)output->bufVal, output->bufLength).ToLocalChecked();
             obj->Set(prop, v8Buffer);
             delete[] output->bufVal;
             break;
@@ -1119,7 +1119,7 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
             obj->Set(prop, OracleTimestampToV8Date(&output->timestampVal));
             break;
           case OutParam::OCCINUMBER:
-            obj->Set(prop, NanNew<Number>((double) output->numberVal));
+            obj->Set(prop, Nan::New<Number>((double) output->numberVal));
             break;
           default:
             char msg[128];
@@ -1134,14 +1134,14 @@ void Connection::handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]) {
       }
     }
   } catch (NodeOracleException &ex) {
-    Handle<Value> argv[2];
-    argv[0] = NanError(ex.getMessage().c_str());
-    argv[1] = NanUndefined();
+    Local<Value> argv[2];
+    argv[0] = Nan::Error(ex.getMessage().c_str());
+    argv[1] = Nan::Undefined();
     baton->callback->Call(2, argv);
   } catch (const std::exception &ex) {
-    Handle<Value> argv[2];
-    argv[0] = NanError(ex.what());
-    argv[1] = NanUndefined();
+    Local<Value> argv[2];
+    argv[0] = Nan::Error(ex.what());
+    argv[1] = Nan::Undefined();
     baton->callback->Call(2, argv);
   }
 
@@ -1159,14 +1159,14 @@ void Connection::setConnection(oracle::occi::Environment* environment,
 }
 
 NAN_METHOD(Connection::ExecuteSync) {
-  NanScope();
-  Connection* connection = ObjectWrap::Unwrap<Connection>(args.This());
+  Nan::HandleScope scope;
+  Connection* connection = Nan::ObjectWrap::Unwrap<Connection>(info.This());
 
   REQ_STRING_ARG(0, sql);
   REQ_ARRAY_ARG(1, values);
   Local<Object> options;
-  if (args.Length() > 2 && args[2]->IsObject() && !args[2]->IsFunction())
-    options = Local<Object>::Cast(args[2]);
+  if (info.Length() > 2 && info[2]->IsObject() && !info[2]->IsFunction())
+    options = Local<Object>::Cast(info[2]);
 
   String::Utf8Value sqlVal(sql);
 
@@ -1174,16 +1174,16 @@ NAN_METHOD(Connection::ExecuteSync) {
       connection->getAutoCommit(), connection->getPrefetchRowCount(),
       *sqlVal, values, options);
   EIO_Execute(&baton->work_req);
-  Handle<Value> argv[2];
+  Local<Value> argv[2];
   handleResult(baton, argv);
 
   if (baton->error) {
     delete baton;
-    return NanThrowError(argv[0]);
+    return Nan::ThrowError(argv[0]);
   }
 
   delete baton;
-  NanReturnValue(argv[1]);
+  info.GetReturnValue().Set(argv[1]);
 }
 
 
