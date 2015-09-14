@@ -901,7 +901,7 @@ Local<Date> OracleDateToV8Date(oracle::occi::Date* d) {
   int year;
   unsigned int month, day, hour, min, sec;
   d->getDate(year, month, day, hour, min, sec);
-  Local<Date> date = Nan::New<Date>(static_cast<double>(time(NULL))).ToLocalChecked();
+  Local<Date> date = Nan::New<Date>(0.0).ToLocalChecked();
   CallDateMethod(date, "setUTCFullYear", year);
   CallDateMethod(date, "setUTCMonth", month - 1);
   CallDateMethod(date, "setUTCDate", day);
@@ -917,7 +917,7 @@ Local<Date> OracleTimestampToV8Date(oracle::occi::Timestamp* d) {
   unsigned int month, day, hour, min, sec, fs, ms;
   d->getDate(year, month, day);
   d->getTime(hour, min, sec, fs);
-  Local<Date> date = Nan::New<Date>(static_cast<double>(time(NULL))).ToLocalChecked();
+  Local<Date> date = Nan::New<Date>(0.0).ToLocalChecked();
   //occi always returns nanoseconds, regardless of precision set on timestamp column
   ms = (fs / 1000000.0) + 0.5; // add 0.5 to round to nearest millisecond
 
@@ -939,37 +939,38 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
       columns.end(); iterator != end; ++iterator, colIndex++) {
     column_t* col = *iterator;
     void* val = currentRow->values[colIndex];
+    Local<String> colName = Nan::New<String>(col->name.c_str()).ToLocalChecked();
     if (val == NULL) {
-      obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::Null());
+      obj->Set(colName, Nan::Null());
     } else {
       switch (col->type) {
       case VALUE_TYPE_STRING: {
         string* v = (string*) val;
-        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::New<String>(v->c_str()).ToLocalChecked());
+        obj->Set(colName, Nan::New<String>(v->c_str()).ToLocalChecked());
         delete v;
       }
         break;
       case VALUE_TYPE_NUMBER: {
         oracle::occi::Number* v = (oracle::occi::Number*) val;
-        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::New<Number>((double) (*v)));
+        obj->Set(colName, Nan::New<Number>((double) (*v)));
         delete v;
       }
         break;
       case VALUE_TYPE_DATE: {
         oracle::occi::Date* v = (oracle::occi::Date*) val;
-        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), OracleDateToV8Date(v));
+        obj->Set(colName, OracleDateToV8Date(v));
         delete v;
       }
         break;
       case VALUE_TYPE_TIMESTAMP: {
         oracle::occi::Timestamp* v = (oracle::occi::Timestamp*) val;
-        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), OracleTimestampToV8Date(v));
+        obj->Set(colName, OracleTimestampToV8Date(v));
         delete v;
       }
         break;
       case VALUE_TYPE_CLOB: {
         buffer_t *v = (buffer_t *) val;
-        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), Nan::New<String>((const char*)v->data, v->length).ToLocalChecked());
+        obj->Set(colName, Nan::New<String>((const char*)v->data, v->length).ToLocalChecked());
         delete[] v->data;
         delete v;
       }
@@ -978,7 +979,7 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
         buffer_t *v = (buffer_t *) val;
         // convert to V8 buffer
         v8::Local<v8::Object> v8Buffer = Nan::NewBuffer((char *)v->data, (uint32_t)v->length).ToLocalChecked();
-        obj->Set(Nan::New<String>(col->name.c_str()).ToLocalChecked(), v8Buffer);
+        obj->Set(colName, v8Buffer);
         // Nan will free the memory of the buffer
         delete v;
         break;
@@ -1109,7 +1110,7 @@ void Connection::handleResult(ExecuteBaton* baton, Local<Value> (&argv)[2]) {
             // convert to V8 buffer
             v8::Local<v8::Object> v8Buffer = Nan::NewBuffer((char *)output->bufVal, output->bufLength).ToLocalChecked();
             obj->Set(prop, v8Buffer);
-            delete[] output->bufVal;
+            // Memory will be freed by NewBuffer GC
             break;
           }
           case OutParam::OCCIDATE:
