@@ -1,3 +1,21 @@
+2015-09-25, Version 1.7.0
+=========================
+
+ * Fix windows build issue (Raymond Feng)
+
+ * Upgrade to nan 2.0.x (Raymond Feng)
+
+ * Fix the demo host name (Raymond Feng)
+
+ * deps: make segfault-handler optional instead of dev (Ryan Graham)
+
+ * load test DB/schema as pretest task (Ryan Graham)
+
+ * test: allow tests to use CI provided DB (Ryan Graham)
+
+ * Update oracle.js (kathan)
+
+
 2015-07-15, Version 1.6.5
 =========================
 
