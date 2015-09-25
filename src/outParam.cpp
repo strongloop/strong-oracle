@@ -3,7 +3,7 @@
 
 using namespace std;
 
-Persistent<FunctionTemplate> OutParam::constructorTemplate;
+Nan::Persistent<FunctionTemplate> OutParam::constructorTemplate;
 
 /**
  * The C++ class represents a JS constructor as follows:
@@ -15,34 +15,34 @@ Persistent<FunctionTemplate> OutParam::constructorTemplate;
  * }
  */
 void OutParam::Init(Handle<Object> target) {
-  NanScope();
+  Nan::HandleScope scope;
 
-  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
-  NanAssignPersistent(constructorTemplate, t);
+  Local<FunctionTemplate> t = Nan::New<FunctionTemplate>(New);
+  constructorTemplate.Reset( t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanNew<String>("OutParam"));
-  target->Set(NanNew<String>("OutParam"),
+  t->SetClassName(Nan::New<String>("OutParam").ToLocalChecked());
+  target->Set(Nan::New<String>("OutParam").ToLocalChecked(),
       t->GetFunction());
 }
 
 NAN_METHOD(OutParam::New) {
-  NanScope();
+  Nan::HandleScope scope;
   OutParam *outParam = new OutParam();
-  outParam->Wrap(args.This());
+  outParam->Wrap(info.This());
 
-  if (args.Length() >= 1) {
+  if (info.Length() >= 1) {
     outParam->_type =
-        args[0]->IsUndefined() ? OutParam::OCCIINT : args[0]->NumberValue();
+        info[0]->IsUndefined() ? OutParam::OCCIINT : info[0]->NumberValue();
   } else {
     outParam->_type = OutParam::OCCIINT;
   }
 
-  if (args.Length() >= 2 && !args[1]->IsUndefined()) {
+  if (info.Length() >= 2 && !info[1]->IsUndefined()) {
     REQ_OBJECT_ARG(1, opts);
     OBJ_GET_NUMBER(opts, "size", outParam->_size, 200);
 
     // check if there's an 'in' param
-    if (opts->Has(NanNew<String>("in"))) {
+    if (opts->Has(Nan::New<String>("in").ToLocalChecked())) {
       outParam->_inOut.hasInParam = true;
       switch (outParam->_type) {
       case OutParam::OCCIINT: {
@@ -70,7 +70,7 @@ NAN_METHOD(OutParam::New) {
       }
     }
   }
-  NanReturnValue(args.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 OutParam::OutParam() {

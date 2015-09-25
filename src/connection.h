@@ -31,9 +31,9 @@ class ConnectionPool;
 /**
  * Wrapper for an OCCI Connection class so that it can be used in JavaScript
  */
-class Connection: public ObjectWrap {
+class Connection: public Nan::ObjectWrap {
 public:
-  static Persistent<FunctionTemplate> s_ct;
+  static Nan::Persistent<FunctionTemplate> s_ct;
   static void Init(Handle<Object> target);
   static NAN_METHOD(New);
 
@@ -111,7 +111,7 @@ public:
   static oracle::occi::Statement* CreateStatement(ExecuteBaton* baton);
   static void ExecuteStatement(ExecuteBaton* baton, oracle::occi::Statement* stmt);
 
-  static void handleResult(ExecuteBaton* baton, Handle<Value> (&argv)[2]);
+  static void handleResult(ExecuteBaton* baton, Local<Value> (&argv)[2]);
 
 private:
   // The OOCI environment
@@ -140,9 +140,9 @@ private:
 /**
  * Wrapper for an OCCI StatelessConnectionPool class so that it can be used in JavaScript
  */
-class ConnectionPool: public ObjectWrap {
+class ConnectionPool: public Nan::ObjectWrap {
 public:
-  static Persistent<FunctionTemplate> s_ct;
+  static Nan::Persistent<FunctionTemplate> s_ct;
 
   static void Init(Handle<Object> target);
   static NAN_METHOD(New);
@@ -195,14 +195,14 @@ public:
   ConnectionPoolBaton(oracle::occi::Environment* environment,
       ConnectionPool* connectionPool,
       oracle::occi::StatelessConnectionPool::DestroyMode destroyMode,
-      const v8::Handle<v8::Function>& callback) {
+      const v8::Local<v8::Function>& callback) {
     this->environment = environment;
     this->connectionPool = connectionPool;
     this->connectionPool->Ref();
     if (callback.IsEmpty() || callback->IsUndefined()) {
       this->callback = NULL;
     } else {
-      this->callback = new NanCallback(callback);
+      this->callback = new Nan::Callback(callback);
     }
     this->connection = NULL;
     this->error = NULL;
@@ -217,7 +217,7 @@ public:
   oracle::occi::Environment* environment;
   ConnectionPool *connectionPool;
   oracle::occi::Connection* connection;
-  NanCallback *callback;
+  Nan::Callback *callback;
   std::string *error;
   oracle::occi::StatelessConnectionPool::DestroyMode destroyMode;
   uv_work_t work_req;
@@ -225,13 +225,13 @@ public:
 
 class ConnectionBaton {
 public:
-  ConnectionBaton(Connection* connection, const v8::Handle<v8::Function>& callback) {
+  ConnectionBaton(Connection* connection, const v8::Local<v8::Function>& callback) {
     this->connection = connection;
     this->connection->Ref();
     if (callback.IsEmpty() || callback->IsUndefined()) {
       this->callback = NULL;
     } else {
-      this->callback = new NanCallback(callback);
+      this->callback = new Nan::Callback(callback);
     }
     this->error = NULL;
   }
@@ -241,7 +241,7 @@ public:
   }
 
   Connection *connection;
-  NanCallback *callback;
+  Nan::Callback *callback;
   std::string *error;
   uv_work_t work_req;
 };

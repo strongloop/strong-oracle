@@ -5,21 +5,21 @@
 
 using namespace std;
 
-Persistent<FunctionTemplate> Statement::s_ct;
+Nan::Persistent<FunctionTemplate> Statement::s_ct;
 
 void Statement::Init(Handle<Object> target) {
-  NanScope();
+  Nan::HandleScope scope;
 
-  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
-  NanAssignPersistent(Statement::s_ct, t);
+  Local<FunctionTemplate> t = Nan::New<FunctionTemplate>(New);
+  Statement::s_ct.Reset( t);
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanNew<String>("Statement"));
+  t->SetClassName(Nan::New<String>("Statement").ToLocalChecked());
 
-  NODE_SET_PROTOTYPE_METHOD(t, "execute", Execute);
-  target->Set(NanNew<String>("Statement"), t->GetFunction());
+  Nan::SetPrototypeMethod(t, "execute", Execute);
+  target->Set(Nan::New<String>("Statement").ToLocalChecked(), t->GetFunction());
 }
 
-Statement::Statement(): ObjectWrap() {
+Statement::Statement(): Nan::ObjectWrap() {
   m_baton = NULL;
 }
 
@@ -29,12 +29,12 @@ Statement::~Statement() {
 }
 
 NAN_METHOD(Statement::New) {
-  NanScope();
+  Nan::HandleScope scope;
 
   Statement* statement = new Statement();
-  statement->Wrap(args.This());
+  statement->Wrap(info.This());
 
-  NanReturnValue(args.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 void Statement::setBaton(StatementBaton* baton) {
@@ -42,23 +42,23 @@ void Statement::setBaton(StatementBaton* baton) {
 }
 
 NAN_METHOD(Statement::Execute) {
-  NanScope();
-  Statement* statement = ObjectWrap::Unwrap<Statement>(args.This());
+  Nan::HandleScope scope;
+  Statement* statement = Nan::ObjectWrap::Unwrap<Statement>(info.This());
   StatementBaton* baton = statement->m_baton;
 
   REQ_ARRAY_ARG(0, values);
   REQ_FUN_ARG(1, callback);
 
-  baton->callback = new NanCallback(callback);
+  baton->callback = new Nan::Callback(callback);
 
   ExecuteBaton::CopyValuesToBaton(baton, values);
   if (baton->error) {
-    Local<String> message = NanNew<String>(baton->error->c_str());
-    return NanThrowError(message);
+    Local<String> message = Nan::New<String>(baton->error->c_str()).ToLocalChecked();
+    return Nan::ThrowError(message);
   }
 
   if (baton->busy) {
-    return NanThrowError("invalid state: statement is busy with another execute call");
+    return Nan::ThrowError("invalid state: statement is busy with another execute call");
   }
   baton->busy = true;
 
@@ -67,7 +67,7 @@ NAN_METHOD(Statement::Execute) {
                 EIO_Execute,
                 (uv_after_work_cb) EIO_AfterExecute);
 
-  NanReturnUndefined();
+  return;
 }
 
 void Statement::EIO_Execute(uv_work_t* req) {
@@ -85,12 +85,12 @@ void Statement::EIO_Execute(uv_work_t* req) {
 }
 
 void Statement::EIO_AfterExecute(uv_work_t* req) {
-  NanScope();
+  Nan::HandleScope scope;
   StatementBaton* baton = CONTAINER_OF(req, StatementBaton, work_req);
 
   baton->busy = false;
 
-  Handle<Value> argv[2];
+  Local<Value> argv[2];
   Connection::handleResult(baton, argv);
 
   baton->ResetValues();

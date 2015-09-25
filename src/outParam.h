@@ -33,11 +33,11 @@ struct outparam_t {
 /**
  * Oracle out parameter
  */
-class OutParam: public ObjectWrap {
+class OutParam: public Nan::ObjectWrap {
 public:
   static void Init(Handle<Object> target);
   static NAN_METHOD(New);
-  static Persistent<FunctionTemplate> constructorTemplate;
+  static Nan::Persistent<FunctionTemplate> constructorTemplate;
   int _type;
   int _size;
   inout_t _inOut;

@@ -13,9 +13,9 @@
 using namespace node;
 using namespace v8;
 
-class Statement: public ObjectWrap {
+class Statement: public Nan::ObjectWrap {
 public:
-  static Persistent<FunctionTemplate> s_ct;
+  static Nan::Persistent<FunctionTemplate> s_ct;
   static void Init(Handle<Object> target);
   static NAN_METHOD(New);
   static NAN_METHOD(Execute);

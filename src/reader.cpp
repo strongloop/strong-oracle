@@ -5,22 +5,22 @@
 
 using namespace std;
 
-Persistent<FunctionTemplate> Reader::s_ct;
+Nan::Persistent<FunctionTemplate> Reader::s_ct;
 
 void Reader::Init(Handle<Object> target) {
-  NanScope();
+  Nan::HandleScope scope;
 
-  Local<FunctionTemplate> t = NanNew<FunctionTemplate>(New);
-  NanAssignPersistent(Reader::s_ct, t);
+  Local<FunctionTemplate> t = Nan::New<FunctionTemplate>(New);
+  Reader::s_ct.Reset( t);
 
   t->InstanceTemplate()->SetInternalFieldCount(1);
-  t->SetClassName(NanNew<String>("Reader"));
+  t->SetClassName(Nan::New<String>("Reader").ToLocalChecked());
 
-  NODE_SET_PROTOTYPE_METHOD(t, "nextRows", NextRows);
-  target->Set(NanNew<String>("Reader"), t->GetFunction());
+  Nan::SetPrototypeMethod(t, "nextRows", NextRows);
+  target->Set(Nan::New<String>("Reader").ToLocalChecked(), t->GetFunction());
 }
 
-Reader::Reader(): ObjectWrap() {
+Reader::Reader(): Nan::ObjectWrap() {
   m_baton = NULL;
 }
 
@@ -30,12 +30,12 @@ Reader::~Reader() {
 }
 
 NAN_METHOD(Reader::New) {
-  NanScope();
+  Nan::HandleScope scope;
 
   Reader* reader = new Reader();
-  reader->Wrap(args.This());
+  reader->Wrap(info.This());
 
-  NanReturnValue(args.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 void Reader::setBaton(ReaderBaton* baton) {
@@ -43,27 +43,27 @@ void Reader::setBaton(ReaderBaton* baton) {
 }
 
 NAN_METHOD(Reader::NextRows) {
-  NanScope();
-  Reader* reader = ObjectWrap::Unwrap<Reader>(args.This());
+  Nan::HandleScope scope;
+  Reader* reader = Nan::ObjectWrap::Unwrap<Reader>(info.This());
   ReaderBaton* baton = reader->m_baton;
   if (baton->error) {
-    Local<String> message = NanNew<String>(baton->error->c_str());
-    return NanThrowError(message);
+    Local<String> message = Nan::New<String>(baton->error->c_str()).ToLocalChecked();
+    return Nan::ThrowError(message);
   }
   if (baton->busy) {
-    return NanThrowError("invalid state: reader is busy with another nextRows call");
+    return Nan::ThrowError("invalid state: reader is busy with another nextRows call");
   }
   baton->busy = true;
 
-  if (args.Length() > 1) {
+  if (info.Length() > 1) {
     REQ_INT_ARG(0, count);
     REQ_FUN_ARG(1, callback);
     baton->count = count;
-    baton->callback = new NanCallback(callback);
+    baton->callback = new Nan::Callback(callback);
   } else {
     REQ_FUN_ARG(0, callback);
     baton->count = baton->m_prefetchRowCount;
-    baton->callback = new NanCallback(callback);
+    baton->callback = new Nan::Callback(callback);
   }
   if (baton->count <= 0) baton->count = 1;
 
@@ -72,7 +72,7 @@ NAN_METHOD(Reader::NextRows) {
                 EIO_NextRows,
                 (uv_after_work_cb) EIO_AfterNextRows);
 
-  NanReturnUndefined();
+  return;
 }
 
 void Reader::EIO_NextRows(uv_work_t* req) {
@@ -115,12 +115,12 @@ void Reader::EIO_NextRows(uv_work_t* req) {
 }
 
 void Reader::EIO_AfterNextRows(uv_work_t* req, int status) {
-  NanScope();
+  Nan::HandleScope scope;
   ReaderBaton* baton = CONTAINER_OF(req, ReaderBaton, work_req);
 
   baton->busy = false;
 
-  Handle<Value> argv[2];
+  Local<Value> argv[2];
   Connection::handleResult(baton, argv);
 
   baton->ResetRows();
