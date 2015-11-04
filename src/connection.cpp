@@ -594,6 +594,9 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt,
     case VALUE_TYPE_NULL:
       stmt->setNull(index, oracle::occi::OCCISTRING);
       break;
+    case VALUE_TYPE_LONG_RAW:
+      stmt->setString(index, *((string*) val->value));
+      break;
     case VALUE_TYPE_STRING:
       stmt->setString(index, *((string*) val->value));
       break;
@@ -683,13 +686,17 @@ int Connection::SetValuesOnStatement(oracle::occi::Statement* stmt,
 void Connection::CreateColumnsFromResultSet(oracle::occi::ResultSet* rs,
     vector<column_t*> &columns) {
   vector<oracle::occi::MetaData> metadata = rs->getColumnListMetaData();
+
+  int colIndex = 1;
   for (vector<oracle::occi::MetaData>::iterator iterator = metadata.begin(),
-      end = metadata.end(); iterator != end; ++iterator) {
+      end = metadata.end(); iterator != end; ++iterator, colIndex++) {
     oracle::occi::MetaData metadata = *iterator;
     column_t* col = new column_t();
     col->name = metadata.getString(oracle::occi::MetaData::ATTR_NAME);
     int type = metadata.getInt(oracle::occi::MetaData::ATTR_DATA_TYPE);
     col->charForm = metadata.getInt(oracle::occi::MetaData::ATTR_CHARSET_FORM);
+
+
     switch (type) {
     case oracle::occi::OCCI_TYPECODE_NUMBER:
     case oracle::occi::OCCI_TYPECODE_FLOAT:
@@ -704,6 +711,10 @@ void Connection::CreateColumnsFromResultSet(oracle::occi::ResultSet* rs,
     case oracle::occi::OCCI_TYPECODE_VARCHAR:
     case oracle::occi::OCCI_TYPECODE_CHAR:
       col->type = VALUE_TYPE_STRING;
+      break;
+    case OCI_TYPECODE_LONG_RAW:
+      rs->setMaxColumnSize(colIndex, LONG_ROW_MAX_SIZE);
+      col->type = VALUE_TYPE_LONG_RAW;
       break;
     case oracle::occi::OCCI_TYPECODE_CLOB:
       col->type = VALUE_TYPE_CLOB;
@@ -744,6 +755,9 @@ row_t* Connection::CreateRowFromCurrentResultSetRow(oracle::occi::ResultSet* rs,
       row->values.push_back(NULL);
     } else {
       switch (col->type) {
+      case VALUE_TYPE_LONG_RAW:
+        row->values.push_back(new string(rs->getString(colIndex)));
+        break;
       case VALUE_TYPE_STRING:
         row->values.push_back(new string(rs->getString(colIndex)));
         break;
@@ -944,6 +958,13 @@ Local<Object> Connection::CreateV8ObjectFromRow(vector<column_t*> columns,
       obj->Set(colName, Nan::Null());
     } else {
       switch (col->type) {
+      case VALUE_TYPE_LONG_RAW: {
+        // NOTE: We could take the time to convert the string to binary here.
+        string* v = (string*) val;
+        obj->Set(colName, Nan::New<String>(v->c_str()).ToLocalChecked());
+        delete v;
+      }
+        break;
       case VALUE_TYPE_STRING: {
         string* v = (string*) val;
         obj->Set(colName, Nan::New<String>(v->c_str()).ToLocalChecked());
