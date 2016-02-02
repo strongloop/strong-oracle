@@ -1,3 +1,11 @@
+2016-02-02, Version 1.8.1
+=========================
+
+ * Fix the assertion (Raymond Feng)
+
+ * instant client v12 is now out on ppc64 (elkorep)
+
+
 2015-12-17, Version 1.8.0
 =========================
 
