@@ -205,9 +205,7 @@ describe('stored procedures with out params', function () {
           done(err);
           return;
         }
-        // purposely commented, gotta love floats in javasctipt: http://stackoverflow.com/questions/588004/is-javascripts-floating-point-math-broken
-        // assert.equal(results.returnParam, 43);
-
+        assert(Math.abs(results.returnParam - 43) < 0.01);
         done();
       });
   });
