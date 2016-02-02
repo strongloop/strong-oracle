@@ -5,9 +5,6 @@
     }, {
       "variables": { "oci_version%": "12" },
     }],
-    ["OS=='linux' and target_arch=='ppc64'", {
-      "variables": { "oci_version%": "11" },
-    }],
   ],
   "targets": [
     {
