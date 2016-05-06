@@ -39,8 +39,5 @@
     "test": "./node_modules/.bin/mocha -R spec --timeout 10000 test/*.js"
   },
   "main": "./index.js",
-  "license": {
-    "name": "StrongLoop",
-    "url": "https://github.com/strongloop/strong-oracle/blob/master/LICENSE"
-  }
+  "license": "Artistic-2.0"
 }
