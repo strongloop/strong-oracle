@@ -1,3 +1,15 @@
+2016-06-03, Version 1.9.0
+=========================
+
+ * Remove segfault-handler (Sam Roberts)
+
+ * update copyright notices and license (Ryan Graham)
+
+ * Fix issue with gcc5 and occi based on gcc4 (Vincent Schoettke)
+
+ * Added basic LONG RAW support. (Paul Kehle)
+
+
 2016-02-02, Version 1.8.1
 =========================
 
