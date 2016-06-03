@@ -81,10 +81,13 @@ void ExecuteBaton::CopyValuesToBaton(ExecuteBaton* baton,
       baton->values.push_back(value);
     }
 
+
+    // VALUE_TYPE_LONG_RAW needed somewhere here.
+
     // string
     else if (val->IsString()) {
       String::Utf8Value utf8Value(val);
-      value->type = VALUE_TYPE_STRING;
+      value->type = VALUE_TYPE_STRING;  
       value->value = new string(*utf8Value);
       baton->values.push_back(value);
     }
@@ -165,6 +168,9 @@ void ExecuteBaton::ResetValues() {
 
     value_t* val = *iterator;
     switch (val->type) {
+      case VALUE_TYPE_LONG_RAW:
+        delete (std::string*)val->value;
+        break;
       case VALUE_TYPE_STRING:
         delete (std::string*)val->value;
         break;

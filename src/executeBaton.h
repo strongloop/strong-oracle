@@ -18,6 +18,15 @@ class Connection;
 
 #include "utils.h"
 
+// Basic LONG ROW support.
+//  LONG ROW data types say they can be up to 2GB in data.  But, if we use 2147483648 as the max size,
+//  we get this error:
+//      ORA-32107: internal OCI memory allocation failure
+//  So, for now, using something smaller, hoping that's good enough (20MB)
+//
+#define OCI_TYPECODE_LONG_RAW   24
+#define LONG_ROW_MAX_SIZE       (20 * 1024 * 1024)
+
 enum {
   VALUE_TYPE_NULL = 1,
   VALUE_TYPE_OUTPUT = 2,
@@ -26,7 +35,8 @@ enum {
   VALUE_TYPE_DATE = 5,
   VALUE_TYPE_TIMESTAMP = 6,
   VALUE_TYPE_CLOB = 7,
-  VALUE_TYPE_BLOB = 8
+  VALUE_TYPE_BLOB = 8,
+  VALUE_TYPE_LONG_RAW = 9
 };
 
 struct column_t {
